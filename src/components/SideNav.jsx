@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const navItems = [
   { name: 'Dashboard', href: '/admin', icon: (
@@ -62,36 +63,49 @@ const navItems = [
 
 function SideNav({ collapsed = false }) {
   return (
-    <aside className={`h-screen ${collapsed ? 'w-20' : 'w-64'} bg-gray-800 text-gray-100 flex flex-col`} aria-label="Sidebar">
-      {/* <div className="flex items-center h-16 px-4 border-b border-gray-700">
-        <Link href="/admin" className="flex items-center gap-3">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-indigo-400">
-            <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-            <path d="M8 12h8" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          {!collapsed && <span className="font-semibold text-lg">TrybeMarket</span>}
+    <aside 
+      className={`h-screen ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800`} 
+      aria-label="Sidebar"
+    >
+      {/* Logo/Brand Section */}
+      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-800/50">
+        <Link href="/admin" className="hover:opacity-90 transition-opacity">
+          <Image 
+            src="/logo.png" 
+            alt="TrybeMarket Logo" 
+            width={160} 
+            height={45}
+            className="object-contain"
+            priority
+          />
         </Link>
-      </div> */}
+      </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-4">
-        <ul className="space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-6">
+        <ul className="space-y-1.5">
           {navItems.map((item) => (
             <li key={item.name}>
-              <Link href={item.href} className="group flex items-center gap-3 p-2 rounded-md text-sm hover:bg-gray-700">
-                <span className="text-gray-300">{item.icon}</span>
-                {!collapsed && <span className="truncate">{item.name}</span>}
+              <Link 
+                href={item.href} 
+                className="group flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/10 hover:backdrop-blur-sm transition-all duration-200 border border-transparent hover:border-white/10 hover:shadow-lg hover:shadow-indigo-500/10"
+              >
+                <span className="text-gray-400 group-hover:text-indigo-400 transition-colors">{item.icon}</span>
+                {!collapsed && <span className="truncate text-gray-300 group-hover:text-white transition-colors">{item.name}</span>}
               </Link>
             </li>
           ))}
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-gray-700">
-        <button type="button" className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-700 text-left">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <div className="p-4 border-t border-gray-800/50">
+        <button 
+          type="button" 
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 text-left border border-transparent hover:border-red-500/20 hover:backdrop-blur-sm transition-all duration-200 group"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-400 group-hover:text-red-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7" />
           </svg>
-          {!collapsed && <span className="text-sm">Logout</span>}
+          {!collapsed && <span className="text-sm font-medium text-gray-300 group-hover:text-red-300 transition-colors">Logout</span>}
         </button>
       </div>
     </aside>

@@ -10,9 +10,23 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <Header />
-      <SideNav />
-      <body>{children}</body>
+      <body className="bg-gray-50">
+        <div className="flex h-screen overflow-hidden">
+          {/* Sidebar */}
+          <SideNav />
+          
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Header */}
+            <Header />
+            
+            {/* Page Content */}
+            <main className="flex-1 overflow-y-auto p-6">
+              {children}
+            </main>
+          </div>
+        </div>
+      </body>
     </html>
   );
 }
