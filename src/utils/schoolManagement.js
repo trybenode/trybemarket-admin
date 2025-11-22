@@ -366,6 +366,56 @@ export const getSchoolUsers = async (schoolId, limitCount = 50) => {
 };
 
 /**
+ * Get a single user by ID with detailed information
+ */
+export const getUserById = async (userId) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    
+    if (!userSnap.exists()) {
+      throw new Error('User not found');
+    }
+    
+    const userData = userSnap.data();
+    
+    // Get products for this user
+    const productsQuery = query(
+      collection(db, 'products'),
+      where('userId', '==', userId)
+    );
+    const productsSnapshot = await getDocs(productsQuery);
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    
+    // Get services for this user
+    const servicesQuery = query(
+      collection(db, 'services'),
+      where('userId', '==', userId)
+    );
+    const servicesSnapshot = await getDocs(servicesQuery);
+    const services = servicesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    
+    return {
+      id: userSnap.id,
+      ...userData,
+      productsCount: products.length,
+      servicesCount: services.length,
+      products,
+      services,
+    };
+  } catch (error) {
+    console.error('Error getting user:', error);
+    throw error;
+  }
+};
+
+/**
  * Format date for display
  */
 export const formatDate = (date) => {

@@ -270,7 +270,11 @@ function Page() {
               <tbody className="divide-y divide-gray-200">
                 {school.usersData && school.usersData.length > 0 ? (
                   school.usersData.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <tr 
+                      key={user.id} 
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/school_management/view-user/${user.id}`)}
+                    >
                       <td className="px-4 py-3 text-sm">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -278,7 +282,7 @@ function Page() {
                               {(user.fullName || user.displayName || user.email || 'U')[0].toUpperCase()}
                             </span>
                           </div>
-                          <span className="text-gray-900 font-medium">{user.fullName || user.displayName || 'N/A'}</span>
+                          <span className="text-gray-900 font-medium hover:text-indigo-600">{user.fullName || user.displayName || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{user.email || 'N/A'}</td>
