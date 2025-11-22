@@ -1,0 +1,55 @@
+// Firestore Security Rules for Admin Dashboard
+// Navigate to: Firebase Console → Firestore → Rules → Copy and Paste
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users can only read their own admin document
+    match /admins/{userId} {
+      allow read: if request.auth.uid == userId;
+      allow write: if false; // Prevent client-side writes, use Admin SDK only
+    }
+    
+    // Admin users can read all users data
+    match /users/{document=**} {
+      allow read, list: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Admin users can read all orders
+    match /orders/{document=**} {
+      allow read, list: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Admin users can read all products
+    match /products/{document=**} {
+      allow read, list: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Admin users can read settings
+    match /settings/{document=**} {
+      allow read: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow write: if false; // Only via Admin SDK
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+/* NOTES:
+   1. Only authenticated users with admin role can read data
+   2. All write operations must go through Admin SDK (server-side)
+   3. This prevents unauthorized client-side modifications
+   4. Admins collection is restricted to prevent accidental exposure
+   5. Each data collection has explicit rules instead of wildcards
+*/
