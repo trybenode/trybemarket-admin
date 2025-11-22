@@ -64,11 +64,22 @@ const navItems = [
 function SideNav({ collapsed = false }) {
   return (
     <aside 
-      className={`h-screen sticky top-0 ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800 rounded-tr-4xl`} 
+      className={`h-screen w-20 lg:w-64 bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800`} 
       aria-label="Sidebar"
     >
+      {/* Admin Profile Section */}
+      <div className="px-4 py-6 border-b border-gray-800/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-linear-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
+            AD
+          </div>
+          <div className="hidden lg:block">
+            <h3 className="text-lg font-bold text-white">Admin</h3>
+            <p className="text-xs text-gray-400">admin@trybemarket.com</p>
+          </div>
+        </div>
+      </div>
     
-
       <nav className="flex-1 overflow-y-auto px-3 py-6">
         <ul className="space-y-1.5">
           {navItems.map((item) => (
@@ -78,7 +89,7 @@ function SideNav({ collapsed = false }) {
                 className="group flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/10 hover:backdrop-blur-sm transition-all duration-200 border border-transparent hover:border-white/10 hover:shadow-lg hover:shadow-indigo-500/10"
               >
                 <span className="text-gray-400 group-hover:text-indigo-400 transition-colors">{item.icon}</span>
-                {!collapsed && <span className="truncate text-gray-300 group-hover:text-white transition-colors">{item.name}</span>}
+                <span className="truncate text-gray-300 group-hover:text-white transition-colors hidden lg:inline">{item.name}</span>
               </Link>
             </li>
           ))}

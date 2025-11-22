@@ -10,12 +10,13 @@ export default function AdminLayout({ children }) {
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50">
-        <Header />
-
-        <div className="flex">
+        <div className="flex h-screen overflow-hidden">
           <SideNav />
 
-          <main className="flex-1 p-6">{children}</main>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Header />
+            <main className="flex-1 overflow-y-auto p-6">{children}</main>
+          </div>
         </div>
       </body>
     </html>

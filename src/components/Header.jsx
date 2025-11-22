@@ -6,7 +6,7 @@ export default function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="w-11/12 mx-auto my-5 rounded-2xl h-16 px-6 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm ">
+    <header className="w-11/12 mx-auto my-5 rounded-2xl h-16 px-6 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
       {/* Search Bar / Title */}
       <div className="flex items-center gap-4 flex-1">
          <Image
