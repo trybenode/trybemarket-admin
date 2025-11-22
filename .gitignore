@@ -51,5 +51,6 @@ next-env.d.ts
 # Firestore Rules
 firestore.rules
 
-# Ignore Gitignore file
-!.gitignore
+
+# Service account
+serviceAccount.json
