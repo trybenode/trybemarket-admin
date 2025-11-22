@@ -16,7 +16,7 @@ import {
 import { db } from '@/lib/firebaseConfig';
 
 /**
- * Get all schools with their statistics
+ * Get all schools with their statistics (lightweight - only user count)
  */
 export const getAllSchools = async () => {
   try {
@@ -35,41 +35,6 @@ export const getAllSchools = async () => {
         );
         const usersCount = await getCountFromServer(usersQuery);
         
-        // Get all users for this school to check their listings
-        const usersSnapshot = await getDocs(usersQuery);
-        const userIds = usersSnapshot.docs.map(doc => doc.id);
-        
-        let productsCount = 0;
-        let servicesCount = 0;
-        
-        // Get products and services count for users of this school
-        if (userIds.length > 0) {
-          // Note: Firestore 'in' queries support up to 30 items
-          // For larger user lists, we'll need to batch the queries
-          const batchSize = 30;
-          for (let i = 0; i < userIds.length; i += batchSize) {
-            const batch = userIds.slice(i, i + batchSize);
-            
-            // Get products count
-            const productsQuery = query(
-              collection(db, 'products'),
-              where('userId', 'in', batch),
-              where('status', '==', 'active')
-            );
-            const productsSnapshot = await getCountFromServer(productsQuery);
-            productsCount += productsSnapshot.data().count;
-            
-            // Get services count
-            const servicesQuery = query(
-              collection(db, 'services'),
-              where('userId', 'in', batch),
-              where('status', '==', 'active')
-            );
-            const servicesSnapshot = await getCountFromServer(servicesQuery);
-            servicesCount += servicesSnapshot.data().count;
-          }
-        }
-        
         return {
           id: schoolDoc.id,
           name: schoolName,
@@ -78,8 +43,6 @@ export const getAllSchools = async () => {
           type: schoolData.type || 'N/A',
           status: schoolData.status || 'Active',
           users: usersCount.data().count,
-          products: productsCount,
-          services: servicesCount,
           createdAt: schoolData.createdAt,
         };
       })
@@ -112,41 +75,24 @@ export const getSchoolById = async (schoolId) => {
       collection(db, 'users'),
       where('selectedUniversity', '==', schoolName)
     );
-    const usersSnapshot = await getDocs(usersQuery);
-    const usersCount = usersSnapshot.docs.length;
-    const userIds = usersSnapshot.docs.map(doc => doc.id);
+    const usersCount = await getCountFromServer(usersQuery);
     
-    let productsCount = 0;
-    let servicesCount = 0;
+    // Get products count by schoolId field (no status filter to get all products)
+    const productsQuery = query(
+      collection(db, 'products'),
+      where('schoolId', '==', schoolId)
+    );
+    const productsCount = await getCountFromServer(productsQuery);
     
-    // Get products and services count for users of this school
-    if (userIds.length > 0) {
-      const batchSize = 30;
-      for (let i = 0; i < userIds.length; i += batchSize) {
-        const batch = userIds.slice(i, i + batchSize);
-        
-        // Get products count
-        const productsQuery = query(
-          collection(db, 'products'),
-          where('userId', 'in', batch),
-          where('status', '==', 'active')
-        );
-        const productsSnapshot = await getCountFromServer(productsQuery);
-        productsCount += productsSnapshot.data().count;
-        
-        // Get services count
-        const servicesQuery = query(
-          collection(db, 'services'),
-          where('userId', 'in', batch),
-          where('status', '==', 'active')
-        );
-        const servicesSnapshot = await getCountFromServer(servicesQuery);
-        servicesCount += servicesSnapshot.data().count;
-      }
-    }
+    // Get services count by schoolId field (no status filter to get all services)
+    const servicesQuery = query(
+      collection(db, 'services'),
+      where('schoolId', '==', schoolId)
+    );
+    const servicesCount = await getCountFromServer(servicesQuery);
     
-    // Get recent listings (products and services)
-    const recentListings = await getRecentListings(schoolId, schoolName, userIds, 10);
+    // Get users for this school
+    const usersData = await getSchoolUsers(schoolId, 10);
     
     return {
       id: schoolSnap.id,
@@ -155,11 +101,11 @@ export const getSchoolById = async (schoolId) => {
       email: schoolData.email || 'N/A',
       type: schoolData.type || 'N/A',
       status: schoolData.status || 'Active',
-      users: usersCount,
-      activeProducts: productsCount,
-      activeServices: servicesCount,
+      users: usersCount.data().count,
+      activeProducts: productsCount.data().count,
+      activeServices: servicesCount.data().count,
       dateJoined: schoolData.createdAt,
-      recentListings,
+      usersData,
     };
   } catch (error) {
     console.error('Error getting school:', error);
@@ -170,57 +116,44 @@ export const getSchoolById = async (schoolId) => {
 /**
  * Get recent listings (products and services) for a school
  */
-export const getRecentListings = async (schoolId, schoolName, userIds, limitCount = 10) => {
+export const getRecentListings = async (schoolId, schoolName, limitCount = 10) => {
   try {
-    const allListings = [];
+    // Get recent products by matching university field with school name
+    const productsQuery = query(
+      collection(db, 'products'),
+      where('university', '==', schoolName),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const productsSnapshot = await getDocs(productsQuery);
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title || doc.data().name || 'N/A',
+      type: 'Product',
+      price: doc.data().price ? `₦${doc.data().price}` : 'N/A',
+      status: doc.data().status || 'active',
+      date: doc.data().createdAt,
+    }));
     
-    if (userIds.length === 0) {
-      return [];
-    }
+    // Get recent services by matching university field with school name
+    const servicesQuery = query(
+      collection(db, 'services'),
+      where('university', '==', schoolName),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    const servicesSnapshot = await getDocs(servicesQuery);
+    const services = servicesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title || doc.data().name || 'N/A',
+      type: 'Service',
+      price: doc.data().price ? `₦${doc.data().price}/hr` : 'N/A',
+      status: doc.data().status || 'active',
+      date: doc.data().createdAt,
+    }));
     
-    // Batch userIds for Firestore 'in' queries (max 30 items)
-    const batchSize = 30;
-    for (let i = 0; i < userIds.length; i += batchSize) {
-      const batch = userIds.slice(i, i + batchSize);
-      
-      // Get recent products
-      const productsQuery = query(
-        collection(db, 'products'),
-        where('userId', 'in', batch),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-      const productsSnapshot = await getDocs(productsQuery);
-      const products = productsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        title: doc.data().title || doc.data().name || 'N/A',
-        type: 'Product',
-        price: doc.data().price ? `₦${doc.data().price}` : 'N/A',
-        status: doc.data().status || 'active',
-        date: doc.data().createdAt,
-      }));
-      
-      // Get recent services
-      const servicesQuery = query(
-        collection(db, 'services'),
-        where('userId', 'in', batch),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-      );
-      const servicesSnapshot = await getDocs(servicesQuery);
-      const services = servicesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        title: doc.data().title || doc.data().name || 'N/A',
-        type: 'Service',
-        price: doc.data().price ? `₦${doc.data().price}/hr` : 'N/A',
-        status: doc.data().status || 'active',
-        date: doc.data().createdAt,
-      }));
-      
-      allListings.push(...products, ...services);
-    }
-    
-    // Sort by date and limit
+    // Combine and sort by date
+    const allListings = [...products, ...services];
     allListings.sort((a, b) => {
       const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
       const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
@@ -312,7 +245,7 @@ export const deleteSchool = async (schoolId) => {
 };
 
 /**
- * Search schools by name
+ * Search schools by name (lightweight - only user count)
  */
 export const searchSchools = async (searchTerm) => {
   try {
@@ -334,35 +267,7 @@ export const searchSchools = async (searchTerm) => {
             collection(db, 'users'),
             where('selectedUniversity', '==', schoolName)
           );
-          const usersSnapshot = await getDocs(usersQuery);
-          const usersCount = usersSnapshot.docs.length;
-          const userIds = usersSnapshot.docs.map(doc => doc.id);
-          
-          let productsCount = 0;
-          let servicesCount = 0;
-          
-          if (userIds.length > 0) {
-            const batchSize = 30;
-            for (let i = 0; i < userIds.length; i += batchSize) {
-              const batch = userIds.slice(i, i + batchSize);
-              
-              const productsQuery = query(
-                collection(db, 'products'),
-                where('userId', 'in', batch),
-                where('status', '==', 'active')
-              );
-              const productsSnapshot = await getCountFromServer(productsQuery);
-              productsCount += productsSnapshot.data().count;
-              
-              const servicesQuery = query(
-                collection(db, 'services'),
-                where('userId', 'in', batch),
-                where('status', '==', 'active')
-              );
-              const servicesSnapshot = await getCountFromServer(servicesQuery);
-              servicesCount += servicesSnapshot.data().count;
-            }
-          }
+          const usersCount = await getCountFromServer(usersQuery);
           
           return {
             id: schoolDoc.id,
@@ -371,9 +276,7 @@ export const searchSchools = async (searchTerm) => {
             email: schoolData.email || 'N/A',
             type: schoolData.type || 'N/A',
             status: schoolData.status || 'Active',
-            users: usersCount,
-            products: productsCount,
-            services: servicesCount,
+            users: usersCount.data().count,
           };
         })
     );
