@@ -67,12 +67,12 @@ function Page() {
     setIsViewModalOpen(true);
   };
 
-  const handleDeleteReview = async (reviewId) => {
+  const handleDeleteReview = async (review) => {
     if (!confirm("Are you sure you want to delete this review?")) return;
     
     try {
       setDeleting(true);
-      await deleteReview(reviewId);
+      await deleteReview(review.parentPath, review.id);
       alert("Review deleted successfully!");
       fetchReviewsData();
     } catch (error) {
@@ -255,12 +255,12 @@ function Page() {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
                             <span className="text-sm font-semibold text-indigo-600">
-                              {(review.reviewerName || 'U').charAt(0).toUpperCase()}
+                              {(review.buyerId || 'U').substring(0, 2).toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{review.reviewerName || 'Anonymous'}</p>
-                            <p className="text-xs text-gray-500">{review.reviewerId || 'N/A'}</p>
+                            <p className="text-sm font-medium text-gray-900">Buyer ID</p>
+                            <p className="text-xs text-gray-500">{review.buyerId || 'N/A'}</p>
                           </div>
                         </div>
                       </td>
@@ -269,7 +269,7 @@ function Page() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-900 line-clamp-2 max-w-md">
-                          {review.comment || review.review || 'No comment'}
+                          {review.review || 'No comment'}
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -288,7 +288,7 @@ function Page() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDeleteReview(review.id)}
+                            onClick={() => handleDeleteReview(review)}
                             disabled={deleting}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete Review"
@@ -327,15 +327,15 @@ function Page() {
             <div className="p-6 space-y-6">
               {/* Reviewer Info */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Reviewer Information</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Review Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Name</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedReview.reviewerName || 'Anonymous'}</p>
+                    <p className="text-xs text-gray-600 mb-1">Buyer ID</p>
+                    <p className="text-sm font-medium text-gray-900 break-all">{selectedReview.buyerId || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 mb-1">Reviewer ID</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedReview.reviewerId || 'N/A'}</p>
+                    <p className="text-xs text-gray-600 mb-1">Seller ID</p>
+                    <p className="text-sm font-medium text-gray-900 break-all">{selectedReview.sellerId || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 mb-1">Date</p>
@@ -356,31 +356,10 @@ function Page() {
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Review</h3>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                    {selectedReview.comment || selectedReview.review || 'No comment provided'}
+                    {selectedReview.review || 'No comment provided'}
                   </p>
                 </div>
               </div>
-
-              {/* Reviewed Item */}
-              {(selectedReview.productId || selectedReview.serviceId) && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Reviewed Item</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">Type</p>
-                      <p className="text-sm font-medium text-gray-900">
-                        {selectedReview.productId ? 'Product' : 'Service'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">Item ID</p>
-                      <p className="text-sm font-medium text-gray-900">
-                        {selectedReview.productId || selectedReview.serviceId}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
@@ -392,7 +371,7 @@ function Page() {
               </button>
               <button
                 onClick={async () => {
-                  await handleDeleteReview(selectedReview.id);
+                  await handleDeleteReview(selectedReview);
                   setIsViewModalOpen(false);
                 }}
                 disabled={deleting}

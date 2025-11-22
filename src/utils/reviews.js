@@ -8,19 +8,23 @@ import {
   where,
   orderBy,
   getCountFromServer,
-  updateDoc
+  updateDoc,
+  collectionGroup
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 
 /**
- * Get all reviews from Firestore
+ * Get all reviews from Firestore (from userReviews subcollection)
  * @returns {Promise<Array>} Array of review objects
  */
 export const getAllReviews = async () => {
   try {
-    const reviewsCollection = collection(db, "reviews");
-    const q = query(reviewsCollection, orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
+    // Use collectionGroup to query all userReviews subcollections across all documents
+    const userReviewsQuery = query(
+      collectionGroup(db, "userReviews"),
+      orderBy("createdAt", "desc")
+    );
+    const querySnapshot = await getDocs(userReviewsQuery);
     
     const reviews = [];
     querySnapshot.forEach((doc) => {
@@ -38,6 +42,7 @@ export const getAllReviews = async () => {
       
       reviews.push({
         id: doc.id,
+        parentPath: doc.ref.parent.parent?.id || null, // Get parent document ID
         ...data,
         createdAt,
       });
@@ -57,13 +62,12 @@ export const getAllReviews = async () => {
  */
 export const getReviewsByRating = async (rating) => {
   try {
-    const reviewsCollection = collection(db, "reviews");
-    const q = query(
-      reviewsCollection,
+    const userReviewsQuery = query(
+      collectionGroup(db, "userReviews"),
       where("rating", "==", rating),
       orderBy("createdAt", "desc")
     );
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(userReviewsQuery);
     
     const reviews = [];
     querySnapshot.forEach((doc) => {
@@ -80,6 +84,7 @@ export const getReviewsByRating = async (rating) => {
       
       reviews.push({
         id: doc.id,
+        parentPath: doc.ref.parent.parent?.id || null,
         ...data,
         createdAt,
       });
@@ -93,13 +98,14 @@ export const getReviewsByRating = async (rating) => {
 };
 
 /**
- * Delete a review
+ * Delete a review from userReviews subcollection
+ * @param {string} parentDocId - Parent document ID
  * @param {string} reviewId - Review ID to delete
  * @returns {Promise<void>}
  */
-export const deleteReview = async (reviewId) => {
+export const deleteReview = async (parentDocId, reviewId) => {
   try {
-    const reviewRef = doc(db, "reviews", reviewId);
+    const reviewRef = doc(db, "reviews", parentDocId, "userReviews", reviewId);
     await deleteDoc(reviewRef);
   } catch (error) {
     console.error("Error deleting review:", error);
@@ -113,7 +119,7 @@ export const deleteReview = async (reviewId) => {
  */
 export const getReviewStats = async () => {
   try {
-    const reviewsCollection = collection(db, "reviews");
+    const userReviewsGroup = collectionGroup(db, "userReviews");
     
     const [
       totalSnapshot,
@@ -123,12 +129,12 @@ export const getReviewStats = async () => {
       rating2Snapshot,
       rating1Snapshot,
     ] = await Promise.all([
-      getCountFromServer(reviewsCollection),
-      getCountFromServer(query(reviewsCollection, where("rating", "==", 5))),
-      getCountFromServer(query(reviewsCollection, where("rating", "==", 4))),
-      getCountFromServer(query(reviewsCollection, where("rating", "==", 3))),
-      getCountFromServer(query(reviewsCollection, where("rating", "==", 2))),
-      getCountFromServer(query(reviewsCollection, where("rating", "==", 1))),
+      getCountFromServer(userReviewsGroup),
+      getCountFromServer(query(userReviewsGroup, where("rating", "==", 5))),
+      getCountFromServer(query(userReviewsGroup, where("rating", "==", 4))),
+      getCountFromServer(query(userReviewsGroup, where("rating", "==", 3))),
+      getCountFromServer(query(userReviewsGroup, where("rating", "==", 2))),
+      getCountFromServer(query(userReviewsGroup, where("rating", "==", 1))),
     ]);
 
     const total = totalSnapshot.data().count;
