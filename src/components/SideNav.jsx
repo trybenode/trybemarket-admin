@@ -3,7 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-
+import { useAuth } from '@/context/AuthContext'
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -66,6 +66,31 @@ const navItems = [
 
 function SideNav({ collapsed = false }) {
   const pathname = usePathname()
+  const { user, adminData } = useAuth()
+  
+  // Get initials from admin name or email
+  const getInitials = () => {
+    if (adminData?.name) {
+      const names = adminData.name.split(' ')
+      return names.length > 1 
+        ? `${names[0][0]}${names[1][0]}`.toUpperCase()
+        : names[0].substring(0, 2).toUpperCase()
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase()
+    }
+    return 'AD'
+  }
+
+  // Get display name
+  const getDisplayName = () => {
+    return adminData?.name || adminData?.displayName || 'Admin'
+  }
+
+  // Get email
+  const getEmail = () => {
+    return user?.email || adminData?.email || ''
+  }
   
   return (
     <aside 
@@ -75,12 +100,20 @@ function SideNav({ collapsed = false }) {
       {/* Admin Profile Section */}
       <div className="px-4 py-6 border-b border-gray-800/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-linear-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
-            AD
-          </div>
+          {adminData?.profilePicture ? (
+            <img 
+              src={adminData.profilePicture} 
+              alt={getDisplayName()}
+              className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500 shadow-lg shrink-0"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-linear-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
+              {getInitials()}
+            </div>
+          )}
           <div className="hidden lg:block">
-            <h3 className="text-lg font-bold text-white">Admin</h3>
-            <p className="text-xs text-gray-400">admin@trybemarket.com</p>
+            <h3 className="text-lg font-bold text-white">{getDisplayName()}</h3>
+            <p className="text-xs text-gray-400">{getEmail()}</p>
           </div>
         </div>
       </div>
