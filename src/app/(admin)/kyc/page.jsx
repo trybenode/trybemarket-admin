@@ -1,65 +1,53 @@
 'use client'
 import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
+import { 
+  getAllKYCRequests, 
+  getKYCRequestsByStatus,
+  approveKYCRequest, 
+  rejectKYCRequest,
+  getKYCStats 
+} from "@/utils/kyc";
+import { useAuth } from "@/context/AuthContext";
 
 function Page() {
+  const { user } = useAuth();
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [kycRequests, setKycRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+  });
 
-  // Sample KYC requests data - replace with actual API data
-  const [kycRequests, setKycRequests] = useState([
-    { 
-      id: 1, 
-      userName: 'John Doe',
-      email: 'john.doe@springfield.edu',
-      phoneNumber: '+1 (555) 123-4567',
-      schoolName: 'Springfield Elementary',
-      status: 'Pending', 
-      submittedDate: 'Nov 18, 2025',
-      schoolIdImage: 'https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=School+ID+Image' // Cloudinary URL placeholder
-    },
-    { 
-      id: 2, 
-      userName: 'Jane Smith',
-      email: 'jane.smith@riverside.edu',
-      phoneNumber: '+1 (555) 987-6543',
-      schoolName: 'Riverside High School',
-      status: 'Approved', 
-      submittedDate: 'Nov 15, 2025',
-      schoolIdImage: 'https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=School+ID+Image'
-    },
-    { 
-      id: 3, 
-      userName: 'Michael Brown',
-      email: 'michael.brown@oakwood.edu',
-      phoneNumber: '+1 (555) 456-7890',
-      schoolName: 'Oakwood Academy',
-      status: 'Pending', 
-      submittedDate: 'Nov 12, 2025',
-      schoolIdImage: 'https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=School+ID+Image'
-    },
-    { 
-      id: 4, 
-      userName: 'Sarah Johnson',
-      email: 'sarah.johnson@sunset.edu',
-      phoneNumber: '+1 (555) 321-0987',
-      schoolName: 'Sunset Middle School',
-      status: 'Rejected', 
-      submittedDate: 'Nov 10, 2025',
-      schoolIdImage: 'https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=School+ID+Image'
-    },
-    { 
-      id: 5, 
-      userName: 'David Wilson',
-      email: 'david.wilson@lincoln.edu',
-      phoneNumber: '+1 (555) 654-3210',
-      schoolName: 'Lincoln Technical Institute',
-      status: 'Pending', 
-      submittedDate: 'Nov 8, 2025',
-      schoolIdImage: 'https://via.placeholder.com/600x400/4F46E5/FFFFFF?text=School+ID+Image'
-    },
-  ]);
+  // Fetch KYC requests on component mount
+  useEffect(() => {
+    fetchKYCData();
+  }, []);
+
+  // Fetch KYC requests and stats from Firebase
+  const fetchKYCData = async () => {
+    try {
+      setLoading(true);
+      const [requests, statistics] = await Promise.all([
+        getAllKYCRequests(),
+        getKYCStats()
+      ]);
+      
+      setKycRequests(requests);
+      setStats(statistics);
+    } catch (error) {
+      console.error("Error fetching KYC data:", error);
+      alert("Failed to load KYC requests. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Prevent background scroll when modal is open
   useEffect(() => {
@@ -79,12 +67,32 @@ function Page() {
     setIsViewModalOpen(true);
   };
 
-  const handleStatusChange = (requestId, newStatus) => {
-    setKycRequests(kycRequests.map(req => 
-      req.id === requestId ? { ...req, status: newStatus } : req
-    ));
-    setIsViewModalOpen(false);
-    // Here you would typically make an API call to update the status
+  const handleStatusChange = async (requestId, newStatus) => {
+    if (!user) {
+      alert("You must be logged in to perform this action.");
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      
+      if (newStatus === 'Approved') {
+        await approveKYCRequest(requestId, user.uid);
+      } else if (newStatus === 'Rejected') {
+        await rejectKYCRequest(requestId, user.uid, "Admin rejected the request");
+      }
+      
+      // Refresh the data after status change
+      await fetchKYCData();
+      
+      setIsViewModalOpen(false);
+      alert(`KYC request has been ${newStatus.toLowerCase()} successfully!`);
+    } catch (error) {
+      console.error("Error updating KYC status:", error);
+      alert("Failed to update KYC status. Please try again.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -100,11 +108,13 @@ function Page() {
     ? kycRequests 
     : kycRequests.filter(req => req.status.toLowerCase() === filterStatus);
 
-  const stats = {
-    total: kycRequests.length,
-    pending: kycRequests.filter(r => r.status === 'Pending').length,
-    approved: kycRequests.filter(r => r.status === 'Approved').length,
-    rejected: kycRequests.filter(r => r.status === 'Rejected').length,
+  // Format date for display
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    if (date instanceof Date) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return date;
   };
 
   return (
@@ -113,6 +123,13 @@ function Page() {
         HeaderText="KYC Management"  
         SubHeaderText="Review and manage KYC verification requests from schools"
       />
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : (
+        <>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -282,12 +299,13 @@ function Page() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-sm text-gray-600">{request.submittedDate}</span>
+                    <span className="text-sm text-gray-600">{formatDate(request.submittedDate)}</span>
                   </td>
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handleViewRequest(request)}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                      disabled={processing}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Review
                     </button>
@@ -403,7 +421,8 @@ function Page() {
             <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0">
               <button
                 onClick={() => setIsViewModalOpen(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium text-sm"
+                disabled={processing}
+                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Close
               </button>
@@ -411,27 +430,43 @@ function Page() {
                 <>
                   <button
                     onClick={() => handleStatusChange(selectedRequest.id, 'Rejected')}
-                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2"
+                    disabled={processing}
+                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Reject
+                    {processing ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Reject
+                      </>
+                    )}
                   </button>
                   <button
                     onClick={() => handleStatusChange(selectedRequest.id, 'Approved')}
-                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2"
+                    disabled={processing}
+                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Approve
+                    {processing ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Approve
+                      </>
+                    )}
                   </button>
                 </>
               )}
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
