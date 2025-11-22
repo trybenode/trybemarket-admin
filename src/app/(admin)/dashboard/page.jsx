@@ -1,12 +1,12 @@
+import React from 'react'
+import PageHeader from '../../../components/PageHeader'
+
 export default function Page() {
   return (
     <main className="container mx-auto p-6">
       <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to TrybeMarket Admin</h1>
-        <p className="text-gray-600">Manage your schools, KYC verifications, and more from this dashboard.</p>
-      </div>
+      <PageHeader HeaderText="Welcome to TrybeMarket Admin" SubHeaderText="Manage your schools, KYC verifications, and more from this dashboard." />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
