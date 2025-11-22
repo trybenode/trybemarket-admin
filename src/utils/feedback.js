@@ -9,6 +9,16 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 
+
+// Data Structure for feedback collection
+// {
+//   title: string,
+//   description: string,
+//   userId: string,           // Reference to users collection
+//   userName: string,         // Optional fallback
+//   userEmail: string,        // Optional fallback
+//   createdAt: Timestamp
+// }
 /**
  * Get all feedback with user information
  */
