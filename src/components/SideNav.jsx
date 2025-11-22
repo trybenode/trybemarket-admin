@@ -68,7 +68,7 @@ function SideNav({ collapsed = false }) {
       aria-label="Sidebar"
     >
       {/* Logo/Brand Section */}
-      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-800/50">
+      {/* <div className="flex items-center justify-center h-16 px-4 border-b border-gray-800/50">
         <Link href="/admin" className="hover:opacity-90 transition-opacity">
           <Image 
             src="/logo.png" 
@@ -79,7 +79,7 @@ function SideNav({ collapsed = false }) {
             priority
           />
         </Link>
-      </div>
+      </div> */}
 
       <nav className="flex-1 overflow-y-auto px-3 py-6">
         <ul className="space-y-1.5">
@@ -97,7 +97,7 @@ function SideNav({ collapsed = false }) {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-gray-800/50">
+      {/* <div className="p-4 border-t border-gray-800/50">
         <button 
           type="button" 
           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 text-left border border-transparent hover:border-red-500/20 hover:backdrop-blur-sm transition-all duration-200 group"
@@ -107,7 +107,7 @@ function SideNav({ collapsed = false }) {
           </svg>
           {!collapsed && <span className="text-sm font-medium text-gray-300 group-hover:text-red-300 transition-colors">Logout</span>}
         </button>
-      </div>
+      </div> */}
     </aside>
   )
 }
