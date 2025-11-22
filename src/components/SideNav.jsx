@@ -64,7 +64,7 @@ const navItems = [
 function SideNav({ collapsed = false }) {
   return (
     <aside 
-      className={`h-auto  ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800 rounded-tr-4xl`} 
+      className={`h-screen sticky top-0 ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800 rounded-tr-4xl`} 
       aria-label="Sidebar"
     >
     
