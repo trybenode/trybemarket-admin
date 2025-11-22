@@ -19,6 +19,65 @@ function Page() {
         SubHeaderText="Manage schools, monitor activity, and track performance across your platform."
       />
 
+      {/* Summary Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Schools */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm2 12v-7l7 3 7-3v7" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-gray-500 text-sm font-medium mb-1">Total Schools</h3>
+          <p className="text-3xl font-bold text-gray-800">{schools.length}</p>
+          <p className="text-sm text-green-600 mt-2">All registered</p>
+        </div>
+
+        {/* Total Users */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-gray-500 text-sm font-medium mb-1">Total Users</h3>
+          <p className="text-3xl font-bold text-gray-800">{schools.reduce((sum, school) => sum + school.users, 0)}</p>
+          <p className="text-sm text-blue-600 mt-2">Across all schools</p>
+        </div>
+
+        {/* Active Products */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-gray-500 text-sm font-medium mb-1">Active Products</h3>
+          <p className="text-3xl font-bold text-gray-800">{schools.reduce((sum, school) => sum + school.products, 0)}</p>
+          <p className="text-sm text-green-600 mt-2">Total listings</p>
+        </div>
+
+        {/* Active Services */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          <h3 className="text-gray-500 text-sm font-medium mb-1">Active Services</h3>
+          <p className="text-3xl font-bold text-gray-800">{schools.reduce((sum, school) => sum + school.services, 0)}</p>
+          <p className="text-sm text-orange-600 mt-2">Total offerings</p>
+        </div>
+      </div>
+
       {/* Search, Filter and Add School Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col md:flex-row gap-4 items-center">
