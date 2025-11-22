@@ -347,63 +347,103 @@ function Page() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  User Information
+                  Student Information
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Full Name</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.userName}</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedRequest.fullName || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Request ID</p>
-                    <p className="text-sm font-medium text-gray-900">#{selectedRequest.id}</p>
+                    <p className="text-xs text-gray-500 mb-1">Matric Number</p>
+                    <p className="text-sm font-medium text-gray-900 font-mono">{selectedRequest.matricNumber || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Email Address</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Phone Number</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.phoneNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">School Name</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.schoolName}</p>
+                    <p className="text-xs text-gray-500 mb-1">User ID</p>
+                    <p className="text-xs font-medium text-gray-900 font-mono">{selectedRequest.userId || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Submitted Date</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.submittedDate}</p>
+                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedRequest.submittedDate)}</p>
                   </div>
                 </div>
               </div>
 
-              {/* School ID Image */}
+              {/* Student ID Images - Front and Back */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  School ID Card
+                  Student ID Card
                 </h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                  <img 
-                    src={selectedRequest.schoolIdImage} 
-                    alt="School ID"
-                    className="w-full h-auto object-contain"
-                  />
-                  <div className="p-3 bg-white border-t border-gray-200">
-                    <a 
-                      href={selectedRequest.schoolIdImage} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      View Full Size
-                    </a>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Front ID */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    <div className="bg-indigo-50 px-3 py-2 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-indigo-900">Front ID</p>
+                    </div>
+                    {selectedRequest.frontID ? (
+                      <>
+                        <img 
+                          src={selectedRequest.frontID} 
+                          alt="Front ID"
+                          className="w-full h-64 object-contain bg-white"
+                        />
+                        <div className="p-3 bg-white border-t border-gray-200">
+                          <a 
+                            href={selectedRequest.frontID} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            View Full Size
+                          </a>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-64 bg-gray-100">
+                        <p className="text-gray-400 text-sm">No front ID uploaded</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Back ID */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    <div className="bg-indigo-50 px-3 py-2 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-indigo-900">Back ID</p>
+                    </div>
+                    {selectedRequest.backID ? (
+                      <>
+                        <img 
+                          src={selectedRequest.backID} 
+                          alt="Back ID"
+                          className="w-full h-64 object-contain bg-white"
+                        />
+                        <div className="p-3 bg-white border-t border-gray-200">
+                          <a 
+                            href={selectedRequest.backID} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            View Full Size
+                          </a>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-64 bg-gray-100">
+                        <p className="text-gray-400 text-sm">No back ID uploaded</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

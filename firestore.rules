@@ -39,6 +39,19 @@ service cloud.firestore {
       allow write: if false; // Only via Admin SDK
     }
     
+    // Admin users can read and update KYC requests
+    match /kycRequests/{requestId} {
+      allow read, list: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow update: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        // Only allow updating these specific fields
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'rejectionReason']
+        );
+      allow create, delete: if false; // Only via Admin SDK or user app
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
@@ -52,4 +65,6 @@ service cloud.firestore {
    3. This prevents unauthorized client-side modifications
    4. Admins collection is restricted to prevent accidental exposure
    5. Each data collection has explicit rules instead of wildcards
+   6. KYC requests can be read and updated by admins (status changes only)
+   7. Creating/deleting KYC requests should be done via Admin SDK or user app
 */
