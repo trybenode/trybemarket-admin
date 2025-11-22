@@ -8,12 +8,9 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
     name: "",
     description: "",
     category: "product",
-    type: "",
-    pricing: {
-      free: false,
-      monthly: "",
-      yearly: "",
-    },
+    type: "free",
+    cycle: "monthly",
+    price: 0,
     features: [],
     active: true,
   });
@@ -26,12 +23,9 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
         name: plan.name || "",
         description: plan.description || "",
         category: plan.category || "product",
-        type: plan.type || "",
-        pricing: {
-          free: plan.pricing?.free || false,
-          monthly: plan.pricing?.monthly || "",
-          yearly: plan.pricing?.yearly || "",
-        },
+        type: plan.type || "free",
+        cycle: plan.cycle || "monthly",
+        price: plan.price || 0,
         features: plan.features || [],
         active: plan.active !== undefined ? plan.active : true,
       });
@@ -40,22 +34,10 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
-    if (name.startsWith("pricing.")) {
-      const pricingField = name.split(".")[1];
-      setFormData((prev) => ({
-        ...prev,
-        pricing: {
-          ...prev.pricing,
-          [pricingField]: type === "checkbox" ? checked : value,
-        },
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: type === "checkbox" ? checked : value,
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
   const handleAddFeature = () => {
@@ -85,27 +67,14 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
 
     try {
       setLoading(true);
-      
-      // Prepare pricing data
-      const pricingData = {
-        free: formData.pricing.free,
-      };
-      
-      if (!formData.pricing.free) {
-        if (formData.pricing.monthly) {
-          pricingData.monthly = parseFloat(formData.pricing.monthly);
-        }
-        if (formData.pricing.yearly) {
-          pricingData.yearly = parseFloat(formData.pricing.yearly);
-        }
-      }
 
       await updatePlan(plan.id, {
         name: formData.name,
         description: formData.description,
         category: formData.category,
         type: formData.type,
-        pricing: pricingData,
+        cycle: formData.cycle,
+        price: formData.type === 'free' ? 0 : parseFloat(formData.price) || 0,
         features: formData.features,
         active: formData.active,
       });

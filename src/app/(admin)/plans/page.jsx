@@ -90,15 +90,30 @@ export default function PlansPage() {
     setIsAddModalOpen(true);
   };
 
-  const formatPrice = (pricing) => {
-    if (!pricing) return "N/A";
-    if (pricing.free) return "Free";
+  const formatPrice = (plan) => {
+    // Handle direct price field (your DB structure)
+    if (plan.price !== undefined) {
+      if (plan.price === 0 || plan.type === 'free') return "Free";
+      
+      // Format based on cycle
+      if (plan.cycle === 'monthly') return `₦${plan.price}/mo`;
+      if (plan.cycle === 'yearly') return `₦${plan.price}/yr`;
+      
+      return `₦${plan.price}`;
+    }
     
-    const prices = [];
-    if (pricing.monthly) prices.push(`₦${pricing.monthly}/mo`);
-    if (pricing.yearly) prices.push(`₦${pricing.yearly}/yr`);
+    // Handle legacy pricing object structure
+    if (plan.pricing) {
+      if (plan.pricing.free) return "Free";
+      
+      const prices = [];
+      if (plan.pricing.monthly) prices.push(`₦${plan.pricing.monthly}/mo`);
+      if (plan.pricing.yearly) prices.push(`₦${plan.pricing.yearly}/yr`);
+      
+      if (prices.length > 0) return prices.join(" or ");
+    }
     
-    return prices.join(" or ");
+    return "N/A";
   };
 
   const getCategoryBadge = (category) => {
@@ -347,7 +362,7 @@ export default function PlansPage() {
                       <span className="text-sm text-gray-900">{plan.type || "N/A"}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-gray-900">{formatPrice(plan.pricing)}</span>
+                      <span className="text-sm font-medium text-gray-900">{formatPrice(plan)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
