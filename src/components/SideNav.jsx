@@ -11,7 +11,7 @@ const navItems = [
     </svg>
   )},
 
-  { name: 'School Management', href: '/school_management', icon: (
+  { name: 'School Management', href: '/school_management/schools', icon: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5">
       <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
         d="M3 7l9-4 9 4-9 4-9-4zm2 12v-7l7 3 7-3v7" />
@@ -41,7 +41,7 @@ const navItems = [
     </svg>
   )},
 
-  { name: 'Delete Data', href: 'delete-data', icon: (
+  { name: 'Delete Data', href: '/delete-data', icon: (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" className="w-5 h-5" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
         d="M6 7h12M9 7V4h6v3m-7 4v7m4-7v7m4-7v7" />
