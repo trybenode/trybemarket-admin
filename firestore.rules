@@ -52,6 +52,18 @@ service cloud.firestore {
       allow create, delete: if false; // Only via Admin SDK or user app
     }
     
+    // Admin users can read, create, update, and delete subscription plans
+    match /subscriptionPlans/{planId} {
+      allow read, list: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow create: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow update: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow delete: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
