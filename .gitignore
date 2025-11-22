@@ -46,3 +46,10 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+
+# Firestore Rules
+firestore.rules
+
+# Ignore Gitignore file
+!.gitignore
