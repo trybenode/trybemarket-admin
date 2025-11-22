@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import EditSchoolModal from "@/components/EditSchoolModal";
 import { useParams, useRouter } from "next/navigation";
-import { getSchoolById, deleteSchool, formatDate } from "@/utils/schoolManagement";
+import { getSchoolById, deleteSchool, formatDate, getSchoolUsers } from "@/utils/schoolManagement";
 
 function Page() {
   const { id } = useParams();
@@ -11,10 +11,30 @@ function Page() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [school, setSchool] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [usersLimit, setUsersLimit] = useState(10);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     loadSchool();
   }, [id]);
+
+  useEffect(() => {
+    if (school) {
+      loadUsers();
+    }
+  }, [usersLimit]);
+
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const users = await getSchoolUsers(id, usersLimit);
+      setSchool(prev => ({ ...prev, usersData: users }));
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const loadSchool = async () => {
     try {
@@ -109,7 +129,7 @@ function Page() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{school.activeProducts}</p>
-              <p className="text-sm text-gray-600">Active Products</p>
+              <p className="text-sm text-gray-600">Total Products</p>
             </div>
           </div>
         </div>
@@ -123,7 +143,7 @@ function Page() {
             </div>
             <div>
               <p className="text-2xl font-bold text-gray-900">{school.activeServices}</p>
-              <p className="text-sm text-gray-600">Active Services</p>
+              <p className="text-sm text-gray-600">Total Services</p>
             </div>
           </div>
         </div>
@@ -177,66 +197,97 @@ function Page() {
           </div>
         </div>
 
-      {/* Recent Listings */}
+      {/* Users List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
-            Recent Listings
+            School Users
           </h3>
-          <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-            View All
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Show:</span>
+            <select
+              value={usersLimit}
+              onChange={(e) => setUsersLimit(Number(e.target.value))}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Title</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Price</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {school.recentListings && school.recentListings.length > 0 ? (
-                school.recentListings.map((listing) => (
-                  <tr key={listing.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">{listing.title}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                        listing.type === 'Product' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-purple-100 text-purple-800'
-                      }`}>
-                        {listing.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{listing.price}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        listing.status === 'active' || listing.status === 'Active'
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {listing.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(listing.date)}</td>
-                  </tr>
-                ))
-              ) : (
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-500">
-                    No recent listings found
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date Joined</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {school.usersData && school.usersData.length > 0 ? (
+                  school.usersData.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-semibold text-indigo-600">
+                              {(user.fullName || user.displayName || user.email || 'U')[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-gray-900 font-medium">{user.fullName || user.displayName || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{user.email || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                          {user.role || user.accountType || 'Student'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          user.status === 'active' || user.isActive
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.status || (user.isActive ? 'Active' : 'Inactive')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(user.createdAt)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-500">
+                      No users found in this school
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {school.usersData?.length || 0} of {school.users} users
+          </span>
+          {school.usersData?.length < school.users && (
+            <span className="text-indigo-600">
+              Select a higher limit to view more users
+            </span>
+          )}
         </div>
       </div>
 
