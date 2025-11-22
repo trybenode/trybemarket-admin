@@ -214,10 +214,22 @@ export const getRecentUsers = async (limitCount = 10) => {
     
     const users = [];
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      let createdAt = null;
+      
+      // Handle both Firestore Timestamp and string dates
+      if (data.createdAt) {
+        if (typeof data.createdAt === 'string') {
+          createdAt = new Date(data.createdAt);
+        } else if (data.createdAt.toDate) {
+          createdAt = data.createdAt.toDate();
+        }
+      }
+      
       users.push({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+        ...data,
+        createdAt,
       });
     });
     
@@ -289,9 +301,6 @@ export const getDashboardStats = async () => {
       totalServices,
       activeSubscriptions,
       monthlySubscriptions,
-      totalRevenue,
-      monthlyRevenue,
-      subscriptionRevenue,
     ] = await Promise.all([
       getTotalUsers(),
       getTotalSchools(),
@@ -299,9 +308,6 @@ export const getDashboardStats = async () => {
       getTotalServices(),
       getTotalActiveSubscriptions(),
       getActiveMonthlySubscriptions(),
-      getTotalRevenue(),
-      getMonthlyRevenue(),
-      getSubscriptionRevenue(),
     ]);
 
     return {
@@ -320,11 +326,6 @@ export const getDashboardStats = async () => {
       subscriptions: {
         total: activeSubscriptions,
         monthly: monthlySubscriptions,
-      },
-      revenue: {
-        total: totalRevenue,
-        monthly: monthlyRevenue,
-        recurring: subscriptionRevenue,
       },
     };
   } catch (error) {
@@ -455,6 +456,146 @@ export const getTopServices = async (limitCount = 5) => {
     return services;
   } catch (error) {
     console.error("Error fetching top services:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get recent products (last N products)
+ * @param {number} limitCount - Number of recent products to fetch
+ * @returns {Promise<Array>} Array of recent product objects
+ */
+export const getRecentProducts = async (limitCount = 10) => {
+  try {
+    const productsCollection = collection(db, "products");
+    const q = query(
+      productsCollection,
+      orderBy("createdAt", "desc"),
+      limit(limitCount)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    const products = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      let createdAt = null;
+      
+      // Handle both Firestore Timestamp and string dates
+      if (data.createdAt) {
+        if (typeof data.createdAt === 'string') {
+          createdAt = new Date(data.createdAt);
+        } else if (data.createdAt.toDate) {
+          createdAt = data.createdAt.toDate();
+        }
+      }
+      
+      products.push({
+        id: doc.id,
+        ...data,
+        createdAt,
+      });
+    });
+    
+    return products;
+  } catch (error) {
+    console.error("Error fetching recent products:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get recent services (last N services)
+ * @param {number} limitCount - Number of recent services to fetch
+ * @returns {Promise<Array>} Array of recent service objects
+ */
+export const getRecentServices = async (limitCount = 10) => {
+  try {
+    const servicesCollection = collection(db, "services");
+    const q = query(
+      servicesCollection,
+      orderBy("createdAt", "desc"),
+      limit(limitCount)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    const services = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      let createdAt = null;
+      
+      // Handle both Firestore Timestamp and string dates
+      if (data.createdAt) {
+        if (typeof data.createdAt === 'string') {
+          createdAt = new Date(data.createdAt);
+        } else if (data.createdAt.toDate) {
+          createdAt = data.createdAt.toDate();
+        }
+      }
+      
+      services.push({
+        id: doc.id,
+        ...data,
+        createdAt,
+      });
+    });
+    
+    return services;
+  } catch (error) {
+    console.error("Error fetching recent services:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get recent activity (users, products, services combined)
+ * @param {number} limitCount - Number of recent activities to fetch per type
+ * @returns {Promise<Array>} Array of recent activity objects sorted by date
+ */
+export const getRecentActivity = async (limitCount = 5) => {
+  try {
+    const [users, products, services] = await Promise.all([
+      getRecentUsers(limitCount),
+      getRecentProducts(limitCount),
+      getRecentServices(limitCount),
+    ]);
+
+    // Combine and format activities
+    const activities = [
+      ...users
+        .filter(user => user.createdAt) // Only include users with valid createdAt
+        .map(user => ({
+          type: 'user',
+          action: 'created account',
+          name: user.fullName || user.displayName || user.email || 'Unknown User',
+          timestamp: user.createdAt,
+          id: user.id,
+        })),
+      ...products
+        .filter(product => product.createdAt) // Only include products with valid createdAt
+        .map(product => ({
+          type: 'product',
+          action: 'posted product',
+          name: product.name || product.title || 'Unnamed Product',
+          timestamp: product.createdAt,
+          id: product.id,
+        })),
+      ...services
+        .filter(service => service.createdAt) // Only include services with valid createdAt
+        .map(service => ({
+          type: 'service',
+          action: 'posted service',
+          name: service.name || service.title || 'Unnamed Service',
+          timestamp: service.createdAt,
+          id: service.id,
+        })),
+    ];
+
+    // Sort by timestamp descending and limit
+    return activities
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limitCount * 2);
+  } catch (error) {
+    console.error("Error fetching recent activity:", error);
     throw error;
   }
 };
