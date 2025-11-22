@@ -64,22 +64,10 @@ const navItems = [
 function SideNav({ collapsed = false }) {
   return (
     <aside 
-      className={`h-screen ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800`} 
+      className={`h-auto  ${collapsed ? 'w-20' : 'w-64'} bg-gray-950 text-gray-100 flex flex-col shadow-2xl border-r border-gray-800 rounded-tr-4xl`} 
       aria-label="Sidebar"
     >
-      {/* Logo/Brand Section */}
-      {/* <div className="flex items-center justify-center h-16 px-4 border-b border-gray-800/50">
-        <Link href="/admin" className="hover:opacity-90 transition-opacity">
-          <Image 
-            src="/logo.png" 
-            alt="TrybeMarket Logo" 
-            width={160} 
-            height={45}
-            className="object-contain"
-            priority
-          />
-        </Link>
-      </div> */}
+    
 
       <nav className="flex-1 overflow-y-auto px-3 py-6">
         <ul className="space-y-1.5">
@@ -97,17 +85,6 @@ function SideNav({ collapsed = false }) {
         </ul>
       </nav>
 
-      {/* <div className="p-4 border-t border-gray-800/50">
-        <button 
-          type="button" 
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-500/10 text-left border border-transparent hover:border-red-500/20 hover:backdrop-blur-sm transition-all duration-200 group"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-400 group-hover:text-red-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7" />
-          </svg>
-          {!collapsed && <span className="text-sm font-medium text-gray-300 group-hover:text-red-300 transition-colors">Logout</span>}
-        </button>
-      </div> */}
     </aside>
   )
 }
