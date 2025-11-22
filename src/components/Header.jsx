@@ -2,10 +2,13 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Header() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   return (
     <header className="w-11/12 mx-auto my-5 rounded-2xl h-16 px-6 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
@@ -58,11 +61,27 @@ export default function Header() {
                 Settings
               </button>
               <hr className="my-2 border-gray-200" />
-              <button className="w-full px-4 py-2 text-red-600 hover:bg-red-50 text-left text-sm flex items-center gap-3 transition-colors">
+              <button 
+                onClick={async () => {
+                  try {
+                    setLoggingOut(true);
+                    setOpen(false);
+                    await logout();
+                    router.push('/login');
+                  } catch (error) {
+                    console.error('Logout error:', error);
+                    alert('Failed to logout. Please try again.');
+                  } finally {
+                    setLoggingOut(false);
+                  }
+                }}
+                disabled={loggingOut}
+                className="w-full px-4 py-2 text-red-600 hover:bg-red-50 text-left text-sm flex items-center gap-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                Logout
+                {loggingOut ? 'Logging out...' : 'Logout'}
               </button>
             </div>
           )}
