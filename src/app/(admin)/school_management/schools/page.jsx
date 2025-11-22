@@ -1,18 +1,37 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
 import PageHeader from '@/components/PageHeader'
+import EditSchoolModal from '@/components/EditSchoolModal'
 import { useRouter } from 'next/navigation'
 
 function Page() {
   const router = useRouter()
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedSchool, setSelectedSchool] = useState(null)
+  
   // Sample data - replace with actual data from API
-  const schools = [
-    { id: 1, name: 'Springfield Elementary', users: 245, products: 18, services: 12, status: 'Active' },
-    { id: 2, name: 'Riverside High School', users: 432, products: 25, services: 15, status: 'Active' },
-    { id: 3, name: 'Oakwood Academy', users: 178, products: 12, services: 8, status: 'Active' },
-    { id: 4, name: 'Sunset Middle School', users: 312, products: 20, services: 10, status: 'Inactive' },
-    { id: 5, name: 'Lincoln Technical Institute', users: 156, products: 15, services: 9, status: 'Active' },
-  ]
+  const [schools, setSchools] = useState([
+    { id: 1, name: 'Springfield Elementary', users: 245, products: 18, services: 12, status: 'Active', address: '742 Evergreen Terrace, Springfield, ST 12345', description: 'A premier educational institution committed to excellence.' },
+    { id: 2, name: 'Riverside High School', users: 432, products: 25, services: 15, status: 'Active', address: '123 River Road, Riverside, RS 54321', description: 'Preparing students for success in college and beyond.' },
+    { id: 3, name: 'Oakwood Academy', users: 178, products: 12, services: 8, status: 'Active', address: '456 Oak Street, Oakwood, OW 67890', description: 'Excellence in education and character development.' },
+    { id: 4, name: 'Sunset Middle School', users: 312, products: 20, services: 10, status: 'Inactive', address: '789 Sunset Blvd, Sunset, SS 13579', description: 'Building foundations for future success.' },
+    { id: 5, name: 'Lincoln Technical Institute', users: 156, products: 15, services: 9, status: 'Active', address: '321 Lincoln Ave, Tech City, TC 24680', description: 'Technical education for the modern workforce.' },
+  ])
+
+  const handleEditClick = (school) => {
+    setSelectedSchool(school)
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveSchool = (updatedData) => {
+    // Update the school in the list
+    setSchools(schools.map(school => 
+      school.id === selectedSchool.id 
+        ? { ...school, ...updatedData }
+        : school
+    ))
+    // Here you would typically make an API call to update the school data
+  }
 
   return (
     <div className="space-y-6">
