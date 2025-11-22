@@ -1,36 +1,95 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import PageHeader from '@/components/PageHeader'
 import EditSchoolModal from '@/components/EditSchoolModal'
+import AddSchoolModal from '@/components/AddSchoolModal'
 import { useRouter } from 'next/navigation'
+import { getAllSchools, searchSchools, deleteSchool } from '@/utils/schoolManagement'
 
 function Page() {
   const router = useRouter()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [selectedSchool, setSelectedSchool] = useState(null)
-  
-  // Sample data - replace with actual data from API
-  const [schools, setSchools] = useState([
-    { id: 1, name: 'Springfield Elementary', users: 245, products: 18, services: 12, status: 'Active', address: '742 Evergreen Terrace, Springfield, ST 12345', description: 'A premier educational institution committed to excellence.' },
-    { id: 2, name: 'Riverside High School', users: 432, products: 25, services: 15, status: 'Active', address: '123 River Road, Riverside, RS 54321', description: 'Preparing students for success in college and beyond.' },
-    { id: 3, name: 'Oakwood Academy', users: 178, products: 12, services: 8, status: 'Active', address: '456 Oak Street, Oakwood, OW 67890', description: 'Excellence in education and character development.' },
-    { id: 4, name: 'Sunset Middle School', users: 312, products: 20, services: 10, status: 'Inactive', address: '789 Sunset Blvd, Sunset, SS 13579', description: 'Building foundations for future success.' },
-    { id: 5, name: 'Lincoln Technical Institute', users: 156, products: 15, services: 9, status: 'Active', address: '321 Lincoln Ave, Tech City, TC 24680', description: 'Technical education for the modern workforce.' },
-  ])
+  const [schools, setSchools] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Load schools on mount
+  useEffect(() => {
+    loadSchools()
+  }, [])
+
+  const loadSchools = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllSchools()
+      setSchools(data)
+    } catch (error) {
+      console.error('Error loading schools:', error)
+      alert('Failed to load schools')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSearch = async (term) => {
+    setSearchTerm(term)
+    if (!term.trim()) {
+      loadSchools()
+      return
+    }
+
+    try {
+      setIsSearching(true)
+      const results = await searchSchools(term)
+      setSchools(results)
+    } catch (error) {
+      console.error('Error searching schools:', error)
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   const handleEditClick = (school) => {
     setSelectedSchool(school)
     setIsEditModalOpen(true)
   }
 
-  const handleSaveSchool = (updatedData) => {
-    // Update the school in the list
-    setSchools(schools.map(school => 
-      school.id === selectedSchool.id 
-        ? { ...school, ...updatedData }
-        : school
-    ))
-    // Here you would typically make an API call to update the school data
+  const handleSaveSchool = async (updatedData) => {
+    try {
+      // Reload schools to get updated data
+      await loadSchools()
+      alert('School updated successfully!')
+    } catch (error) {
+      console.error('Error updating school:', error)
+      alert('Failed to update school')
+    }
+  }
+
+  const handleDeleteSchool = async (schoolId) => {
+    if (!confirm('Are you sure you want to delete this school? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await deleteSchool(schoolId)
+      setSchools(schools.filter(school => school.id !== schoolId))
+      alert('School deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting school:', error)
+      alert(error.message || 'Failed to delete school')
+    }
+  }
+
+  const handleAddSchool = async (newSchool) => {
+    try {
+      await loadSchools()
+      alert('School added successfully!')
+    } catch (error) {
+      console.error('Error after adding school:', error)
+    }
   }
 
   return (
@@ -53,6 +112,8 @@ function Page() {
               <input
                 type="text"
                 placeholder="Search schools..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
               />
             </div>
@@ -67,7 +128,10 @@ function Page() {
           </button>
 
           {/* Add New School Button */}
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -78,32 +142,45 @@ function Page() {
 
       {/* Schools Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  School Name
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Users
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Active Products
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Active Services
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {schools.map((school) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : schools.length === 0 ? (
+          <div className="text-center py-12">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No schools found</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by adding a new school.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    School Name
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Users
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Active Products
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Active Services
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {schools.map((school) => (
                 <tr key={school.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
@@ -164,7 +241,7 @@ function Page() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
-                      <button className="p-2 hover:bg-red-50 rounded-lg transition-colors group" title="Delete">
+                      <button className="p-2 hover:bg-red-50 rounded-lg transition-colors group" title="Delete" onClick={() => handleDeleteSchool(school.id)}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500 group-hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -172,28 +249,31 @@ function Page() {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Showing <span className="font-medium">1</span> to <span className="font-medium">5</span> of <span className="font-medium">5</span> schools
+        {!loading && schools.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Showing <span className="font-medium">1</span> to <span className="font-medium">{schools.length}</span> of <span className="font-medium">{schools.length}</span> schools
+            </div>
+            <div className="flex gap-2">
+              <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Previous
+              </button>
+              <button className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
+                1
+              </button>
+              <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Next
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-              Previous
-            </button>
-            <button className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors">
-              1
-            </button>
-            <button className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-              Next
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Edit School Modal */}
@@ -202,6 +282,13 @@ function Page() {
         onClose={() => setIsEditModalOpen(false)}
         school={selectedSchool}
         onSave={handleSaveSchool}
+      />
+
+      {/* Add School Modal */}
+      <AddSchoolModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddSchool}
       />
     </div>
   )

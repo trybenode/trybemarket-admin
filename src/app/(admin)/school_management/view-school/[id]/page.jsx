@@ -1,39 +1,81 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import EditSchoolModal from "@/components/EditSchoolModal";
 import { useParams, useRouter } from "next/navigation";
+import { getSchoolById, deleteSchool, formatDate } from "@/utils/schoolManagement";
 
 function Page() {
   const { id } = useParams();
   const router = useRouter();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [school, setSchool] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Sample school data - replace with actual API data
-  const [school, setSchool] = useState({
-    id: id,
-    name: "Springfield Elementary",
-    address: "742 Evergreen Terrace, Springfield, ST 12345",
-    status: "Active",
-    dateJoined: "January 15, 2023",
-    lastActive: "2 hours ago",
-    users: 245,
-    activeProducts: 18,
-    activeServices: 12,
-    description: "A premier educational institution committed to excellence in learning and student development.",
-    recentListings: [
-      { id: 1, title: "Mathematics Textbook Set", type: "Product", price: "$120", status: "Active", date: "Nov 18, 2025" },
-      { id: 2, title: "Science Lab Equipment", type: "Product", price: "$450", status: "Active", date: "Nov 15, 2025" },
-      { id: 3, title: "Tutoring Services", type: "Service", price: "$50/hr", status: "Active", date: "Nov 12, 2025" },
-      { id: 4, title: "Sports Equipment Bundle", type: "Product", price: "$280", status: "Pending", date: "Nov 10, 2025" },
-    ]
-  });
+  useEffect(() => {
+    loadSchool();
+  }, [id]);
 
-  const handleSaveSchool = (updatedData) => {
-    // Update school data with edited values
-    setSchool({ ...school, ...updatedData });
-    // Here you would typically make an API call to update the school data
+  const loadSchool = async () => {
+    try {
+      setLoading(true);
+      const data = await getSchoolById(id);
+      setSchool(data);
+    } catch (error) {
+      console.error('Error loading school:', error);
+      alert('Failed to load school details');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSaveSchool = async (updatedData) => {
+    try {
+      // Reload school data
+      await loadSchool();
+      alert('School updated successfully!');
+    } catch (error) {
+      console.error('Error updating school:', error);
+      alert('Failed to update school');
+    }
+  };
+
+  const handleDeleteSchool = async () => {
+    if (!confirm('Are you sure you want to delete this school? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteSchool(id);
+      alert('School deleted successfully!');
+      router.push('/school_management/schools');
+    } catch (error) {
+      console.error('Error deleting school:', error);
+      alert(error.message || 'Failed to delete school');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!school) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-lg font-medium text-gray-900">School not found</h3>
+        <button 
+          onClick={() => router.push('/school_management/schools')}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Back to Schools
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -102,9 +144,22 @@ function Page() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Address</p>
-              <p className="text-sm text-gray-900">{school.address}</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Location</p>
+              <p className="text-sm text-gray-900">{school.location}</p>
             </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Email</p>
+              <p className="text-sm text-gray-900">{school.email}</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">School Type</p>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                {school.type}
+              </span>
+            </div>
+            
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Status</p>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -116,8 +171,8 @@ function Page() {
               </span>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Description</p>
-              <p className="text-sm text-gray-900">{school.description}</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Date Joined</p>
+              <p className="text-sm text-gray-900">{formatDate(school.dateJoined)}</p>
             </div>
           </div>
         </div>
@@ -147,31 +202,39 @@ function Page() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {school.recentListings.map((listing) => (
-                <tr key={listing.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm text-gray-900 font-medium">{listing.title}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                      listing.type === 'Product' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : 'bg-purple-100 text-purple-800'
-                    }`}>
-                      {listing.type}
-                    </span>
+              {school.recentListings && school.recentListings.length > 0 ? (
+                school.recentListings.map((listing) => (
+                  <tr key={listing.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm text-gray-900 font-medium">{listing.title}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        listing.type === 'Product' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        {listing.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{listing.price}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        listing.status === 'active' || listing.status === 'Active'
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {listing.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(listing.date)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-500">
+                    No recent listings found
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 font-semibold">{listing.price}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      listing.status === 'Active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {listing.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{listing.date}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -194,7 +257,7 @@ function Page() {
           </svg>
           <span className="font-medium">Generate Report</span>
         </button>
-        <button className="flex items-center gap-2 px-6 py-3 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+        <button className="flex items-center gap-2 px-6 py-3 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors" onClick={handleDeleteSchool}>
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
