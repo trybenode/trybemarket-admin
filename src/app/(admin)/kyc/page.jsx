@@ -21,7 +21,7 @@ function Page() {
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
-    approved: 0,
+    verified: 0,
     rejected: 0,
   });
 
@@ -97,10 +97,19 @@ function Page() {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case 'Approved': return 'bg-green-100 text-green-800';
-      case 'Rejected': return 'bg-red-100 text-red-800';
-      case 'Pending': return 'bg-yellow-100 text-yellow-800';
+      case 'verified': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusDisplay = (status) => {
+    switch(status) {
+      case 'verified': return 'Verified';
+      case 'rejected': return 'Rejected';
+      case 'pending': return 'Pending';
+      default: return status;
     }
   };
 
@@ -169,8 +178,8 @@ function Page() {
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{stats.approved}</p>
-              <p className="text-sm text-gray-600">Approved</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.verified}</p>
+              <p className="text-sm text-gray-600">Verified</p>
             </div>
           </div>
         </div>
@@ -215,14 +224,14 @@ function Page() {
             Pending ({stats.pending})
           </button>
           <button
-            onClick={() => setFilterStatus('approved')}
+            onClick={() => setFilterStatus('verified')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === 'approved'
+              filterStatus === 'verified'
                 ? 'bg-green-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Approved ({stats.approved})
+            Verified ({stats.verified})
           </button>
           <button
             onClick={() => setFilterStatus('rejected')}
@@ -244,13 +253,10 @@ function Page() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  User Details
+                  Student Details
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  School Name
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Contact
+                  Matric Number
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
@@ -270,32 +276,26 @@ function Page() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
                         <span className="text-indigo-600 font-semibold text-sm">
-                          {request.userName.split(' ').map(n => n[0]).join('')}
+                          {request.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'N/A'}
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{request.userName}</p>
-                        <p className="text-xs text-gray-500">ID: {request.id}</p>
+                        <p className="text-sm font-semibold text-gray-900">{request.fullName || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">User ID: {request.userId?.slice(0, 8)}...</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm2 12v-7l7 3 7-3v7" />
+                        <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="text-sm text-gray-900">{request.schoolName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-sm text-gray-900">{request.email}</p>
-                      <p className="text-xs text-gray-500">{request.phoneNumber}</p>
+                      <span className="text-sm text-gray-900 font-mono">{request.matricNumber || 'N/A'}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                      {request.status}
+                      {getStatusDisplay(request.status)}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -412,7 +412,7 @@ function Page() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Current Status</h3>
                 <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusColor(selectedRequest.status)}`}>
-                  {selectedRequest.status}
+                  {getStatusDisplay(selectedRequest.status)}
                 </span>
               </div>
             </div>
@@ -426,7 +426,7 @@ function Page() {
               >
                 Close
               </button>
-              {selectedRequest.status === 'Pending' && (
+              {selectedRequest.status === 'pending' && (
                 <>
                   <button
                     onClick={() => handleStatusChange(selectedRequest.id, 'Rejected')}
