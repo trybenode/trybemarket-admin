@@ -82,14 +82,28 @@ export const getSchoolById = async (schoolId) => {
       collection(db, 'products'),
       where('schoolId', '==', schoolId)
     );
-    const productsCount = await getCountFromServer(productsQuery);
+    const productsSnapshot = await getDocs(productsQuery);
+    const productsCount = productsSnapshot.docs.length;
+    
+    // Get distinct product sellers (unique userIds)
+    const productUserIds = new Set(
+      productsSnapshot.docs.map(doc => doc.data().userId).filter(Boolean)
+    );
+    const distinctProductSellers = productUserIds.size;
     
     // Get services count by schoolId field (no status filter to get all services)
     const servicesQuery = query(
       collection(db, 'services'),
       where('schoolId', '==', schoolId)
     );
-    const servicesCount = await getCountFromServer(servicesQuery);
+    const servicesSnapshot = await getDocs(servicesQuery);
+    const servicesCount = servicesSnapshot.docs.length;
+    
+    // Get distinct service providers (unique userIds)
+    const serviceUserIds = new Set(
+      servicesSnapshot.docs.map(doc => doc.data().userId).filter(Boolean)
+    );
+    const distinctServiceProviders = serviceUserIds.size;
     
     // Get users for this school
     const usersData = await getSchoolUsers(schoolId, 10);
@@ -102,8 +116,10 @@ export const getSchoolById = async (schoolId) => {
       type: schoolData.type || 'N/A',
       status: schoolData.status || 'Active',
       users: usersCount.data().count,
-      activeProducts: productsCount.data().count,
-      activeServices: servicesCount.data().count,
+      activeProducts: productsCount,
+      activeServices: servicesCount,
+      distinctProductSellers,
+      distinctServiceProviders,
       dateJoined: schoolData.createdAt,
       usersData,
     };
@@ -312,10 +328,35 @@ export const getSchoolUsers = async (schoolId, limitCount = 50) => {
     );
     
     const usersSnapshot = await getDocs(usersQuery);
-    const users = usersSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    
+    // Get products and services count for each user
+    const users = await Promise.all(
+      usersSnapshot.docs.map(async (userDoc) => {
+        const userData = userDoc.data();
+        const userId = userDoc.id;
+        
+        // Count products for this user
+        const productsQuery = query(
+          collection(db, 'products'),
+          where('userId', '==', userId)
+        );
+        const productsCount = await getCountFromServer(productsQuery);
+        
+        // Count services for this user
+        const servicesQuery = query(
+          collection(db, 'services'),
+          where('userId', '==', userId)
+        );
+        const servicesCount = await getCountFromServer(servicesQuery);
+        
+        return {
+          id: userId,
+          ...userData,
+          productsCount: productsCount.data().count,
+          servicesCount: servicesCount.data().count,
+        };
+      })
+    );
     
     return users;
   } catch (error) {

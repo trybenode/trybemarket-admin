@@ -106,6 +106,7 @@ function Page() {
         />
 
       {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
@@ -147,6 +148,35 @@ function Page() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{school.distinctProductSellers || 0}</p>
+              <p className="text-sm text-gray-600">Product Sellers</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{school.distinctServiceProviders || 0}</p>
+              <p className="text-sm text-gray-600">Service Providers</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* School Information and Admin Contact */}
         {/* School Information */}
@@ -232,7 +262,8 @@ function Page() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Products</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Services</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date Joined</th>
                 </tr>
               </thead>
@@ -257,20 +288,31 @@ function Page() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          user.status === 'active' || user.isActive
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {user.status || (user.isActive ? 'Active' : 'Inactive')}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-7 h-7 bg-green-100 rounded flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                          </div>
+                          <span className="text-gray-900 font-semibold">{user.productsCount || 0}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-7 h-7 bg-orange-100 rounded flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <span className="text-gray-900 font-semibold">{user.servicesCount || 0}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{formatDate(user.createdAt)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-4 py-8 text-center text-sm text-gray-500">
+                    <td colSpan="6" className="px-4 py-8 text-center text-sm text-gray-500">
                       No users found in this school
                     </td>
                   </tr>
