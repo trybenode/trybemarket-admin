@@ -3,7 +3,7 @@ import PageHeader from '../../../components/PageHeader'
 
 export default function Page() {
   return (
-    <main className="container mx-auto p-6">
+    <main className="container mx-auto">
       <div className="space-y-6">
       {/* Welcome Section */}
       <PageHeader HeaderText="Welcome to TrybeMarket Admin" SubHeaderText="Manage your schools, KYC verifications, and more from this dashboard." />
