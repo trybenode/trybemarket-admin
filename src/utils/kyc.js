@@ -22,15 +22,16 @@ import { db } from "@/lib/firebaseConfig";
 export const getAllKYCRequests = async () => {
   try {
     const kycCollection = collection(db, "kycRequests");
-    const q = query(kycCollection, orderBy("submittedDate", "desc"));
+    const q = query(kycCollection, orderBy("submittedAt", "desc"));
     const querySnapshot = await getDocs(q);
     
     const kycRequests = [];
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
       kycRequests.push({
         id: doc.id,
-        ...doc.data(),
-        submittedDate: doc.data().submittedDate?.toDate?.() || new Date(),
+        ...data,
+        submittedDate: data.submittedAt?.toDate?.() || new Date(),
       });
     });
     
@@ -43,7 +44,7 @@ export const getAllKYCRequests = async () => {
 
 /**
  * Get KYC requests filtered by status
- * @param {string} status - Status to filter by ('Pending', 'Approved', 'Rejected')
+ * @param {string} status - Status to filter by ('pending', 'verified', 'rejected')
  * @returns {Promise<Array>} Array of filtered KYC request objects
  */
 export const getKYCRequestsByStatus = async (status) => {
@@ -52,16 +53,17 @@ export const getKYCRequestsByStatus = async (status) => {
     const q = query(
       kycCollection, 
       where("status", "==", status),
-      orderBy("submittedDate", "desc")
+      orderBy("submittedAt", "desc")
     );
     const querySnapshot = await getDocs(q);
     
     const kycRequests = [];
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
       kycRequests.push({
         id: doc.id,
-        ...doc.data(),
-        submittedDate: doc.data().submittedDate?.toDate?.() || new Date(),
+        ...data,
+        submittedDate: data.submittedAt?.toDate?.() || new Date(),
       });
     });
     
@@ -83,10 +85,11 @@ export const getKYCRequestById = async (requestId) => {
     const docSnap = await getDoc(kycDoc);
     
     if (docSnap.exists()) {
+      const data = docSnap.data();
       return {
         id: docSnap.id,
-        ...docSnap.data(),
-        submittedDate: docSnap.data().submittedDate?.toDate?.() || new Date(),
+        ...data,
+        submittedDate: data.submittedAt?.toDate?.() || new Date(),
       };
     } else {
       throw new Error("KYC request not found");
@@ -108,16 +111,17 @@ export const getKYCRequestsByUserId = async (userId) => {
     const q = query(
       kycCollection, 
       where("userId", "==", userId),
-      orderBy("submittedDate", "desc")
+      orderBy("submittedAt", "desc")
     );
     const querySnapshot = await getDocs(q);
     
     const kycRequests = [];
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
       kycRequests.push({
         id: doc.id,
-        ...doc.data(),
-        submittedDate: doc.data().submittedDate?.toDate?.() || new Date(),
+        ...data,
+        submittedDate: data.submittedAt?.toDate?.() || new Date(),
       });
     });
     
@@ -129,9 +133,9 @@ export const getKYCRequestsByUserId = async (userId) => {
 };
 
 /**
- * Update KYC request status (Approve or Reject)
+ * Update KYC request status (Verify or Reject)
  * @param {string} requestId - The ID of the KYC request
- * @param {string} newStatus - The new status ('Approved' or 'Rejected')
+ * @param {string} newStatus - The new status ('verified' or 'rejected')
  * @param {string} adminId - The ID of the admin making the change
  * @param {string} reason - Optional reason for rejection
  * @returns {Promise<Object>} Updated KYC request object
@@ -148,7 +152,7 @@ export const updateKYCStatus = async (requestId, newStatus, adminId, reason = nu
     };
     
     // Add rejection reason if provided
-    if (newStatus === "Rejected" && reason) {
+    if (newStatus === "rejected" && reason) {
       updateData.rejectionReason = reason;
     }
     
@@ -156,10 +160,11 @@ export const updateKYCStatus = async (requestId, newStatus, adminId, reason = nu
     
     // Get the updated document
     const updatedDoc = await getDoc(kycDoc);
+    const data = updatedDoc.data();
     return {
       id: updatedDoc.id,
-      ...updatedDoc.data(),
-      submittedDate: updatedDoc.data().submittedDate?.toDate?.() || new Date(),
+      ...data,
+      submittedDate: data.submittedAt?.toDate?.() || new Date(),
     };
   } catch (error) {
     console.error("Error updating KYC status:", error);
@@ -168,14 +173,14 @@ export const updateKYCStatus = async (requestId, newStatus, adminId, reason = nu
 };
 
 /**
- * Approve KYC request
+ * Approve/Verify KYC request
  * @param {string} requestId - The ID of the KYC request
  * @param {string} adminId - The ID of the admin approving the request
  * @returns {Promise<Object>} Updated KYC request object
  */
 export const approveKYCRequest = async (requestId, adminId) => {
   try {
-    return await updateKYCStatus(requestId, "Approved", adminId);
+    return await updateKYCStatus(requestId, "verified", adminId);
   } catch (error) {
     console.error("Error approving KYC request:", error);
     throw error;
@@ -191,7 +196,7 @@ export const approveKYCRequest = async (requestId, adminId) => {
  */
 export const rejectKYCRequest = async (requestId, adminId, reason) => {
   try {
-    return await updateKYCStatus(requestId, "Rejected", adminId, reason);
+    return await updateKYCStatus(requestId, "rejected", adminId, reason);
   } catch (error) {
     console.error("Error rejecting KYC request:", error);
     throw error;
@@ -210,13 +215,13 @@ export const createKYCRequest = async (kycData) => {
     
     const kycRequestData = {
       userId: kycData.userId,
-      userName: kycData.userName,
-      email: kycData.email,
-      phoneNumber: kycData.phoneNumber,
-      schoolName: kycData.schoolName,
-      schoolIdImage: kycData.schoolIdImage, // Cloudinary URL
-      status: "Pending",
-      submittedDate: serverTimestamp(),
+      fullName: kycData.fullName,
+      matricNumber: kycData.matricNumber,
+      frontID: kycData.frontID, // Cloudinary URL for front of ID
+      backID: kycData.backID,   // Cloudinary URL for back of ID
+      status: "pending",
+      notificationSent: false,
+      submittedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -254,9 +259,9 @@ export const getKYCStats = async () => {
     
     const stats = {
       total: allRequests.length,
-      pending: allRequests.filter(req => req.status === "Pending").length,
-      approved: allRequests.filter(req => req.status === "Approved").length,
-      rejected: allRequests.filter(req => req.status === "Rejected").length,
+      pending: allRequests.filter(req => req.status === "pending").length,
+      verified: allRequests.filter(req => req.status === "verified").length,
+      rejected: allRequests.filter(req => req.status === "rejected").length,
     };
     
     return stats;
@@ -276,17 +281,18 @@ export const getRecentKYCRequests = async (limitCount = 10) => {
     const kycCollection = collection(db, "kycRequests");
     const q = query(
       kycCollection, 
-      orderBy("submittedDate", "desc"),
+      orderBy("submittedAt", "desc"),
       limit(limitCount)
     );
     const querySnapshot = await getDocs(q);
     
     const kycRequests = [];
     querySnapshot.forEach((doc) => {
+      const data = doc.data();
       kycRequests.push({
         id: doc.id,
-        ...doc.data(),
-        submittedDate: doc.data().submittedDate?.toDate?.() || new Date(),
+        ...data,
+        submittedDate: data.submittedAt?.toDate?.() || new Date(),
       });
     });
     
@@ -298,20 +304,28 @@ export const getRecentKYCRequests = async (limitCount = 10) => {
 };
 
 /**
- * Update KYC request school ID image
+ * Update KYC request ID images (front and/or back)
  * @param {string} requestId - The ID of the KYC request
- * @param {string} newImageUrl - New Cloudinary image URL
+ * @param {Object} imageUrls - Object containing frontID and/or backID URLs
  * @returns {Promise<void>}
  */
-export const updateSchoolIdImage = async (requestId, newImageUrl) => {
+export const updateIDImages = async (requestId, imageUrls) => {
   try {
     const kycDoc = doc(db, "kycRequests", requestId);
-    await updateDoc(kycDoc, {
-      schoolIdImage: newImageUrl,
+    const updateData = {
       updatedAt: serverTimestamp(),
-    });
+    };
+    
+    if (imageUrls.frontID) {
+      updateData.frontID = imageUrls.frontID;
+    }
+    if (imageUrls.backID) {
+      updateData.backID = imageUrls.backID;
+    }
+    
+    await updateDoc(kycDoc, updateData);
   } catch (error) {
-    console.error("Error updating school ID image:", error);
+    console.error("Error updating ID images:", error);
     throw error;
   }
 };
@@ -323,7 +337,7 @@ export const updateSchoolIdImage = async (requestId, newImageUrl) => {
 export const getPendingKYCCount = async () => {
   try {
     const kycCollection = collection(db, "kycRequests");
-    const q = query(kycCollection, where("status", "==", "Pending"));
+    const q = query(kycCollection, where("status", "==", "pending"));
     const querySnapshot = await getDocs(q);
     
     return querySnapshot.size;
