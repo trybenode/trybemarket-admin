@@ -49,13 +49,6 @@ const navItems = [
     </svg>
   )},
 
-  { name: 'Delete Data', href: '/delete-data', icon: (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" className="w-5 h-5" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
-        d="M6 7h12M9 7V4h6v3m-7 4v7m4-7v7m4-7v7" />
-    </svg>
-  )},
-
   { name: 'Feedback Page', href: '/feedback', icon: (
     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
