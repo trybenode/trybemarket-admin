@@ -102,26 +102,31 @@ export default function AddPlanModal({ onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl border border-gray-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Add New Plan</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-linear-to-r from-indigo-50 to-white shrink-0">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add New Plan
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Form - Scrollable */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Plan Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Plan Name *
             </label>
             <input
@@ -129,7 +134,7 @@ export default function AddPlanModal({ onClose, onSave }) {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
               placeholder="e.g., Premium Plan"
               required
             />
@@ -137,7 +142,7 @@ export default function AddPlanModal({ onClose, onSave }) {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Description
             </label>
             <textarea
@@ -145,7 +150,7 @@ export default function AddPlanModal({ onClose, onSave }) {
               value={formData.description}
               onChange={handleInputChange}
               rows="3"
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900 resize-none"
               placeholder="Brief description of the plan"
             />
           </div>
@@ -153,14 +158,14 @@ export default function AddPlanModal({ onClose, onSave }) {
           {/* Category and Type */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category *
               </label>
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
                 required
               >
                 <option value="product">Product</option>
@@ -172,7 +177,7 @@ export default function AddPlanModal({ onClose, onSave }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Type
               </label>
               <input
@@ -180,7 +185,7 @@ export default function AddPlanModal({ onClose, onSave }) {
                 name="type"
                 value={formData.type}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
                 placeholder="e.g., Student, Business"
               />
             </div>
@@ -188,25 +193,25 @@ export default function AddPlanModal({ onClose, onSave }) {
 
           {/* Pricing */}
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-300">
+            <label className="block text-sm font-medium text-gray-700">
               Pricing
             </label>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
               <input
                 type="checkbox"
                 name="pricing.free"
                 checked={formData.pricing.free}
                 onChange={handleInputChange}
-                className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-2 focus:ring-indigo-600"
+                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
               />
-              <span className="text-gray-300">Free Plan</span>
+              <span className="text-sm font-medium text-gray-700">Free Plan</span>
             </div>
 
             {!formData.pricing.free && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">
+                  <label className="block text-xs text-gray-600 mb-2">
                     Monthly Price (₦)
                   </label>
                   <input
@@ -215,13 +220,13 @@ export default function AddPlanModal({ onClose, onSave }) {
                     value={formData.pricing.monthly}
                     onChange={handleInputChange}
                     step="0.01"
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
                     placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">
+                  <label className="block text-xs text-gray-600 mb-2">
                     Yearly Price (₦)
                   </label>
                   <input
@@ -230,7 +235,7 @@ export default function AddPlanModal({ onClose, onSave }) {
                     value={formData.pricing.yearly}
                     onChange={handleInputChange}
                     step="0.01"
-                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
                     placeholder="0.00"
                   />
                 </div>
@@ -240,7 +245,7 @@ export default function AddPlanModal({ onClose, onSave }) {
 
           {/* Features */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Features
             </label>
             
@@ -255,13 +260,13 @@ export default function AddPlanModal({ onClose, onSave }) {
                     handleAddFeature();
                   }
                 }}
-                className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
                 placeholder="Add a feature..."
               />
               <button
                 type="button"
                 onClick={handleAddFeature}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
               >
                 Add
               </button>
@@ -271,15 +276,15 @@ export default function AddPlanModal({ onClose, onSave }) {
               {formData.features.map((feature, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between bg-gray-800 px-4 py-2 rounded-lg"
+                  className="flex items-center justify-between bg-gray-50 border border-gray-200 px-4 py-2.5 rounded-lg"
                 >
-                  <span className="text-gray-300">{feature}</span>
+                  <span className="text-sm text-gray-700">{feature}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveFeature(index)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
+                    className="text-red-500 hover:text-red-700 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -289,35 +294,49 @@ export default function AddPlanModal({ onClose, onSave }) {
           </div>
 
           {/* Active Status */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
             <input
               type="checkbox"
               name="active"
               checked={formData.active}
               onChange={handleInputChange}
-              className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-2 focus:ring-indigo-600"
+              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
             />
-            <span className="text-gray-300">Plan is active</span>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Creating..." : "Create Plan"}
-            </button>
+            <span className="text-sm font-medium text-gray-700">Plan is active</span>
           </div>
         </form>
+
+        {/* Footer - Actions */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Creating...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Plan
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
