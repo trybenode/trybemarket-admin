@@ -165,16 +165,19 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type
+                Type *
               </label>
-              <input
-                type="text"
+              <select
                 name="type"
                 value={formData.type}
                 onChange={handleInputChange}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
-                placeholder="e.g., Student, Business"
-              />
+                required
+              >
+                <option value="free">Free</option>
+                <option value="paid">Paid</option>
+                <option value="premium">Premium</option>
+              </select>
             </div>
           </div>
 
@@ -184,49 +187,44 @@ export default function EditPlanModal({ plan, onClose, onSave }) {
               Pricing
             </label>
             
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <input
-                type="checkbox"
-                name="pricing.free"
-                checked={formData.pricing.free}
-                onChange={handleInputChange}
-                className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Free Plan</span>
-            </div>
-
-            {!formData.pricing.free && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">
-                    Monthly Price (₦)
-                  </label>
-                  <input
-                    type="number"
-                    name="pricing.monthly"
-                    value={formData.pricing.monthly}
-                    onChange={handleInputChange}
-                    step="0.01"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">
-                    Yearly Price (₦)
-                  </label>
-                  <input
-                    type="number"
-                    name="pricing.yearly"
-                    value={formData.pricing.yearly}
-                    onChange={handleInputChange}
-                    step="0.01"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
-                    placeholder="0.00"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">
+                  Billing Cycle *
+                </label>
+                <select
+                  name="cycle"
+                  value={formData.cycle}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900"
+                  required
+                >
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                  <option value="one-time">One-time</option>
+                </select>
               </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">
+                  Price (₦) *
+                </label>
+                <input
+                  type="number"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  step="0.01"
+                  min="0"
+                  disabled={formData.type === 'free'}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            
+            {formData.type === 'free' && (
+              <p className="text-xs text-gray-500 italic">Free plans have a price of ₦0</p>
             )}
           </div>
 
