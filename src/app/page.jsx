@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');s
+    setError('');
     setSuccessMessage('');
 
     if (!email || !password) {
