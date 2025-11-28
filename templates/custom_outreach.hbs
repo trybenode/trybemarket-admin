@@ -1,0 +1,126 @@
+{{!-- <!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        .header { background-color: #4f46e5; color: white; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; font-size: 20px; font-weight: bold; }
+        .content { padding: 20px 0; }
+        .signature { margin-top: 30px; padding-top: 10px; border-top: 1px solid #eee; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            Trybemarket Admin Outreach
+        </div>
+        
+        <div class="content">
+            <p style="font-weight: bold;">Hello,</p> 
+            
+            <!-- ADMIN'S CUSTOM BODY CONTENT GOES HERE -->
+            <!-- We will assume the admin is writing simple text/HTML in the form -->
+            {{{customBody}}} 
+            
+        </div>
+        
+        <div class="signature">
+            <p>Regards,</p>
+            <p><strong>{{adminName}}</strong><br>Trybemarket Admin Team</p>
+        </div>
+    </div>
+</body>
+</html> --}}
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #111; 
+            background-color: #f4f4f4; 
+            padding: 20px;
+        }
+
+        .container { 
+            max-width: 650px; 
+            margin: 20px auto; 
+            background-color: #ffffff; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        /* Header with Logo */
+        .header {
+            background-color: #4c7bfc;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .header img {
+            width: 150px;
+            height: auto;
+        }
+
+        /* Yellow Title Bar */
+        .title-bar {
+            background-color: #facc15;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            color: #111;
+            font-size: 17px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .content { 
+            padding: 25px; 
+            color: #333;
+            font-size: 15px;
+        }
+
+        .signature { 
+            margin-top: 30px; 
+            padding-top: 15px; 
+            border-top: 1px solid #eee; 
+            font-size: 14px; 
+            color: #555; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- LOGO HEADER -->
+        <div class="header">
+            <img src="https://www.trybemarket.online/assets/logo.png" alt="Trybemarket Logo">
+        </div>
+
+        <!-- SUBJECT BAR -->
+        {{!-- <div class="title-bar">
+            Trybemarket Admin Outreach
+        </div> --}}
+
+        <!-- MAIN CONTENT -->
+        <div class="content">
+
+            <p style="font-weight: bold;">Hello,</p>
+
+            <!-- ADMIN CUSTOM CONTENT -->
+            {{{customBody}}}
+
+            <div class="signature">
+                <p>Regards,</p>
+                <p><strong>{{adminName}}</strong><br>Trybemarket Admin Team</p>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
