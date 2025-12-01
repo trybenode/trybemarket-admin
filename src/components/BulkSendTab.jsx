@@ -1,21 +1,19 @@
-// components/BulkSendTab.jsx
 'use client';
 
 import React, { useState } from 'react';
-import { Megaphone, Users, Send, Loader2 } from 'lucide-react';
+import { Megaphone, Users, Loader2 } from 'lucide-react';
 import { sendBulkEmail } from '@/utils/email';
 
 const initialFormData = {
-  target: 'all_active',
+  target: 'all_users',
   subject: '',
   body: '',
   adminName: 'Admin Team',
 };
 
+// Simplified audience
 const audiences = {
-  all_active: { name: 'All Active Users', count: 12500, color: 'indigo' },
-  no_login_90d: { name: 'Inactive 90+ Days', count: 3400, color: 'amber' },
-  has_products: { name: 'Active Sellers', count: 8700, color: 'emerald' },
+  all_users: { name: 'All Registered Users', count: 'All', color: 'indigo' },
 };
 
 export default function BulkSendTab() {
@@ -24,11 +22,11 @@ export default function BulkSendTab() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const selectedAudience = audiences[formData.target];
+  const selectedAudience = audiences.all_users;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSend = async (e) => {
@@ -42,13 +40,15 @@ export default function BulkSendTab() {
       if (!formData.body.trim()) throw new Error('Email content is required');
       if (!formData.adminName.trim()) throw new Error('Your name is required');
 
-      await sendBulkEmail(formData);
+      const response = await sendBulkEmail(formData);
 
       setMessage(
-        `Bulk send initiated successfully!\nTarget: ${selectedAudience.count.toLocaleString()} users`
+        `Bulk send initiated successfully! Job ID: ${response.jobId}. Target: ${response.totalAttempted.toLocaleString()} users.`
       );
+
+      setFormData((prev) => ({ ...initialFormData, adminName: prev.adminName }));
     } catch (err) {
-      setError(err.message || 'Failed to start bulk send job');
+      setError(err.message || 'Failed to start bulk send job. Check API logs.');
     } finally {
       setLoading(false);
     }
@@ -62,62 +62,47 @@ export default function BulkSendTab() {
           <Megaphone className="w-7 h-7 text-emerald-600" />
           Bulk Newsletter & Announcement Sender
         </h3>
-        <p className="mt-2 text-gray-600">Send HTML newsletters to thousands of users at once</p>
+        <p className="mt-2 text-gray-600">
+          This system queues the job into Firestore for background processing.
+        </p>
       </div>
 
+      {/* Form */}
       <form onSubmit={handleSend} className="p-6 md:p-8 space-y-8">
         {/* Audience Selection */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-4">Target Audience</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-4">
+            Target Audience
+          </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {Object.entries(audiences).map(([key, aud]) => (
-              <label
-                key={key}
-                className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all ${
-                  formData.target === key
-                    ? `border-${aud.color}-500 bg-${aud.color}-50 ring-4 ring-${aud.color}-100`
-                    : 'border-slate-200 hover:border-slate-300 bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="target"
-                  value={key}
-                  checked={formData.target === key}
-                  onChange={handleChange}
-                  className="sr-only"
-                />
-                <div className="text-center">
-                  <Users className={`w-10 h-10 mx-auto mb-3 ${formData.target === key ? `text-${aud.color}-600` : 'text-gray-400'}`} />
-                  <div className={`font-semibold text-lg ${formData.target === key ? `text-${aud.color}-700` : 'text-gray-800'}`}>
-                    {aud.name}
-                  </div>
-                  <div className="text-3xl font-black mt-2 text-gray-900">
-                    {aud.count.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-500">users</div>
-                </div>
-              </label>
-            ))}
+            <label className="relative p-6 rounded-xl border-2 cursor-pointer transition-all border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100">
+              <input
+                type="radio"
+                name="target"
+                value={selectedAudience.target}
+                checked={true}
+                onChange={handleChange}
+                className="sr-only"
+              />
+              <div className="text-center">
+                <Users className="w-10 h-10 mx-auto mb-3 text-indigo-600" />
+                <div className="font-semibold text-lg text-indigo-700">{selectedAudience.name}</div>
+                <div className="text-3xl font-black mt-2 text-gray-900">{selectedAudience.count}</div>
+                <div className="text-sm text-gray-500">users</div>
+              </div>
+            </label>
           </div>
-
-          {/* Selected Count Highlight */}
-          <div className="mt-6 p-5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-            <div className="text-center">
-              <div className="text-4xl font-black text-gray-900">
-                {selectedAudience.count.toLocaleString()}
-              </div>
-              <div className="text-lg font-medium text-gray-600">
-                users will receive this newsletter
-              </div>
-            </div>
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm font-medium">
+            ⚠️ Warning: This will query all users in the 'users' collection. Please ensure your query cost expectations are met.
           </div>
         </div>
 
         {/* Email Content */}
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Newsletter Subject</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Newsletter Subject
+            </label>
             <input
               type="text"
               name="subject"
@@ -142,9 +127,6 @@ export default function BulkSendTab() {
               placeholder="<h1>Welcome back!</h1><p>Here's what's new this week...</p>"
               className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition font-mono text-sm leading-relaxed"
             />
-            {/* <p className="mt-2 text-xs text-gray-600">
-              Paste full HTML. Supports <code className="bg-gray-200 px-1 rounded"></code>, <code className="bg-gray-200 px-1 rounded">{{firstName}}</code>, and <code className="bg-gray-200 px-1 rounded">{{adminName}}</code>
-            </p> */}
           </div>
         </div>
 
@@ -164,7 +146,7 @@ export default function BulkSendTab() {
           />
         </div>
 
-        {/* Feedback */}
+        {/* Feedback Messages */}
         {message && (
           <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 font-medium">
             {message}
@@ -176,7 +158,7 @@ export default function BulkSendTab() {
           </div>
         )}
 
-        {/* Submit */}
+        {/* Submit Button */}
         <button
           type="submit"
           disabled={loading || !formData.subject || !formData.body}
@@ -190,7 +172,7 @@ export default function BulkSendTab() {
           ) : (
             <>
               <Megaphone className="w-7 h-7" />
-              Send to {selectedAudience.count.toLocaleString()} Users
+              Initiate Bulk Send Job
             </>
           )}
         </button>

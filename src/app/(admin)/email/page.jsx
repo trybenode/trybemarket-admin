@@ -10,7 +10,7 @@ export default function EmailCenterPage() {
 
     const tabs = [
         { id: 'adhoc', name: 'Manual/Transactional Send' },
-        { id: 'bulk', name: 'Bulk Newsletter Send' },
+        // { id: 'bulk', name: 'Bulk Newsletter Send' },
         // { id: 'logs', name: 'Delivery Logs & History' }, // Added for completeness in UI vision
     ];
 
