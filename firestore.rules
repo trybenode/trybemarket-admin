@@ -8,7 +8,7 @@ service cloud.firestore {
     // Users can only read their own admin document
     match /admins/{userId} {
       allow read: if request.auth.uid == userId;
-      allow write: if false; // Prevent client-side writes, use Admin SDK only
+      allow create, update, delete: if false; // Prevent all writes - use Admin SDK only
     }
     
     // Admin users can read all users data
