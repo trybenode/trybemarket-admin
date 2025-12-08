@@ -71,7 +71,7 @@ export default function Header() {
                     setLoggingOut(true);
                     setOpen(false);
                     await logout();
-                    router.push('/login');
+                    router.push('/');
                   } catch (error) {
                     console.error('Logout error:', error);
                     alert('Failed to logout. Please try again.');
