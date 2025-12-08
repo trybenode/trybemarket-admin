@@ -33,7 +33,7 @@ export default function EmailCenterPage() {
     };
 
     return (
-        <main className="container">
+        <main className="container mx-auto">
             <div className="space-y-6">
                 {/* 1. Page Header */}
                 <PageHeader 
