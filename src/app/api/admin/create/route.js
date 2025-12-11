@@ -175,6 +175,8 @@ export async function POST(request) {
 
     if (error.code === 'auth/email-already-exists') {
       errorMessage = 'An admin with this email already exists';
+    } else if (error.code === 'permission-denied') {
+      errorMessage = 'Missing or insufficient permissions when writing to Firestore. Check Admin SDK credentials and Firestore rules.';
     } else if (error.code === 'auth/invalid-email') {
       errorMessage = 'Invalid email address';
     } else if (error.code === 'auth/weak-password') {

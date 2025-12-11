@@ -32,21 +32,32 @@
 
 
 // Firebase Admin SDK configuration for server-side operations
-import admin from "firebase-admin";
+import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   try {
+    // Prefer the server-side env var; fall back to the public one if set for convenience
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    if (!projectId || !clientEmail || !rawPrivateKey) {
+      console.warn('Firebase Admin SDK environment variables are not fully set: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY');
+    }
+
+    const privateKey = rawPrivateKey ? rawPrivateKey.replace(/\\n/g, '\n') : undefined;
+
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        projectId,
+        clientEmail,
+        privateKey,
       }),
     });
 
-    console.log("Firebase Admin initialized successfully ✔");
+    console.log('Firebase Admin initialized successfully ✔');
   } catch (error) {
-    console.error("Firebase Admin init error ❌:", error);
+    console.error('Firebase Admin init error ❌:', error);
     throw error;
   }
 }
