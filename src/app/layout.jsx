@@ -2,6 +2,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata = {
+  icons: { icon: "/trybemarket.png" },
   title: "TrybeMarket Admin",
   description: "Admin dashboard for TrybeMarket",
 };
