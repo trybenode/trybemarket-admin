@@ -10,7 +10,7 @@ export function ProtectedRoute({ children }) {
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
-      router.push('/login');
+      router.push('/');
     }
   }, [user, loading, isAdmin, router]);
 
