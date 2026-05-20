@@ -370,23 +370,66 @@ export default function Page() {
           </div>
 
           {/* User Segments */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">User Segments</h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                { key: 'activated_active', label: 'Active Sellers', color: 'bg-green-100 text-green-800' },
-                { key: 'activated_dormant', label: 'Dormant Sellers', color: 'bg-yellow-100 text-yellow-800' },
-                { key: 'never_activated', label: 'Never Listed', color: 'bg-red-100 text-red-800' },
-                { key: 'subscribed', label: 'Subscribed', color: 'bg-indigo-100 text-indigo-800' },
-                { key: 'churned', label: 'Churned', color: 'bg-gray-100 text-gray-700' },
-              ].map(({ key, label, color }) => (
-                <div key={key} className={`rounded-lg p-4 ${color}`}>
-                  <p className="text-2xl font-bold">{analytics?.segments?.[key] ?? '—'}</p>
-                  <p className="text-xs font-medium mt-1">{label}</p>
+          {(() => {
+            const seg = analytics?.segments ?? {};
+            const total = Object.values(seg).reduce((s, v) => s + (v || 0), 0) || 1;
+            const pct = (n) => Math.round(((n || 0) / total) * 100);
+            const activityRows = [
+              { segKey: 'activated_active', label: 'Active Sellers', desc: 'Listed something in the last 14 days', bar: '#22c55e', badge: 'bg-green-100 text-green-700' },
+              { segKey: 'activated_dormant', label: 'Dormant Sellers', desc: 'Have listings but inactive 14+ days', bar: '#eab308', badge: 'bg-yellow-100 text-yellow-700' },
+              { segKey: 'never_activated', label: 'Never Listed', desc: 'Registered but never posted a product or service', bar: '#f87171', badge: 'bg-red-50 text-red-600' },
+            ];
+            const subRows = [
+              { segKey: 'subscribed', label: 'Active Subscribers', desc: 'Currently on a paid plan', bar: '#6366f1', badge: 'bg-indigo-100 text-indigo-700' },
+              { segKey: 'churned', label: 'Churned', desc: 'Had a paid plan that has since expired', bar: '#9ca3af', badge: 'bg-gray-100 text-gray-600' },
+            ];
+            const SegRow = ({ segKey, label, desc, bar, badge }) => {
+              const count = seg[segKey] ?? 0;
+              const p = pct(count);
+              return (
+                <div className="py-3 border-b border-gray-100 last:border-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${badge}`}>{label}</span>
+                    <span className="text-xl font-bold text-gray-900">{count.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 rounded-full transition-all" style={{ width: `${p}%`, backgroundColor: bar }} />
+                    </div>
+                    <span className="text-xs text-gray-400 w-8 text-right shrink-0">{p}%</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{desc}</p>
                 </div>
-              ))}
-            </div>
-          </div>
+              );
+            };
+            return (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">User Segments</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">How your {total.toLocaleString()} users are distributed</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Marketplace Activity */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Marketplace Activity</p>
+                    {activityRows.map(row => <SegRow key={row.segKey} {...row} />)}
+                  </div>
+                  {/* Subscription Status */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Subscription Status</p>
+                    {subRows.map(row => <SegRow key={row.segKey} {...row} />)}
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <p className="text-xs text-gray-500">
+                        <span className="font-medium text-gray-700">Note:</span> Churned and subscribed users are classified by subscription first, regardless of listing status.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </>
       ) : null}
 
