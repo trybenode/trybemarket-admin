@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react'
 import PageHeader from '../../../components/PageHeader'
 import { getDashboardStats, getRecentActivity } from '@/utils/dashboard'
+import { getAuth } from 'firebase/auth'
+import { collection, getDocs } from 'firebase/firestore'
+import { db } from '@/lib/firebaseConfig'
 
 export default function Page() {
   const [stats, setStats] = useState({
@@ -13,9 +16,15 @@ export default function Page() {
   });
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [schools, setSchools] = useState([]);
+  const [selectedCampus, setSelectedCampus] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchSchools();
+    fetchAnalytics();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -31,6 +40,42 @@ export default function Page() {
       console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSchools = async () => {
+    try {
+      const schoolsSnap = await getDocs(collection(db, 'schools'));
+      setSchools(schoolsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+    }
+  };
+
+  const fetchAnalytics = async (campusId = null) => {
+    try {
+      setAnalyticsLoading(true);
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+      
+      const url = campusId 
+        ? `/api/analytics-dashboard?campus_id=${campusId}`
+        : '/api/analytics-dashboard';
+      
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAnalytics(data);
+      } else {
+        console.error('Analytics API returned error:', res.status);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -90,6 +135,25 @@ export default function Page() {
       <div className="space-y-6">
       {/* Welcome Section */}
       <PageHeader HeaderText="Welcome to TrybeMarket Admin" SubHeaderText="Manage your schools, KYC verifications, and more from this dashboard." />
+
+      {/* Campus Filter */}
+      <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <label className="text-sm font-medium text-gray-700">Filter by Campus:</label>
+        <select
+          value={selectedCampus || ''}
+          onChange={(e) => {
+            const newCampus = e.target.value || null;
+            setSelectedCampus(newCampus);
+            fetchAnalytics(newCampus);
+          }}
+          className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="">All Campuses</option>
+          {schools.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
 
       {/* Stats Grid */}
       {loading ? (
@@ -176,6 +240,155 @@ export default function Page() {
           </div>
         </>
       )}
+
+      {/* Analytics Section */}
+      {analyticsLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : analytics ? (
+        <>
+          {/* North Star Metric - Weekly Transacting Pairs */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">Weekly Transacting Pairs</h2>
+                <p className="text-sm text-gray-500">Unique buyer-seller conversations started this week</p>
+              </div>
+              <div className="text-right">
+                <p className="text-4xl font-bold text-indigo-600">{analytics?.wtp ?? '—'}</p>
+                <p className="text-xs text-gray-500 mt-1">This week</p>
+              </div>
+            </div>
+            {/* Simple trend bars */}
+            <div className="flex items-end gap-2 h-20">
+              {analytics?.wtpTrend?.map((w, i) => {
+                const maxPairs = Math.max(...(analytics.wtpTrend?.map(x => x.pairs) || [1]), 1);
+                const height = Math.max(8, (w.pairs / maxPairs) * 72);
+                const isCurrentWeek = i === analytics.wtpTrend.length - 1;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full rounded-t"
+                      style={{
+                        height: `${height}px`,
+                        backgroundColor: isCurrentWeek ? '#6366f1' : '#e0e7ff'
+                      }}
+                    />
+                    <span className="text-xs text-gray-400">{w.pairs}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between mt-1">
+              {analytics?.wtpTrend?.map((w, i) => (
+                <span key={i} className="text-xs text-gray-400 flex-1 text-center">{w.week}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <p className="text-sm text-gray-600 mb-1">Activation Rate</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {analytics?.funnel && analytics.funnel[0]?.count > 0 ? 
+                  `${Math.round((analytics.funnel[1]?.count / analytics.funnel[0]?.count) * 100) || 0}%`
+                  : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Registered → KYC verified (30d)</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <p className="text-sm text-gray-600 mb-1">Listing → Message Rate</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {analytics?.listingToMessageRate !== undefined ? `${analytics.listingToMessageRate}%` : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Listings that received a buyer message (30d)</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <p className="text-sm text-gray-600 mb-1">4-Week Seller Retention</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {analytics?.retentionRate !== undefined ? `${analytics.retentionRate}%` : '—'}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Week 1 sellers still active in Week 4</p>
+            </div>
+          </div>
+
+          {/* Activation Funnel */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Activation Funnel (Last 30 Days)</h2>
+            <div className="space-y-3">
+              {analytics?.funnel?.map((stage, i, arr) => {
+                const pct = i === 0 ? 100 : Math.round((stage.count / arr[0].count) * 100);
+                const dropoff = i > 0 ? Math.round(((arr[i-1].count - stage.count) / arr[i-1].count) * 100) : 0;
+                return (
+                  <div key={stage.stage}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-700">{stage.stage}</span>
+                      <div className="flex items-center gap-3">
+                        {i > 0 && dropoff > 0 && (
+                          <span className="text-xs text-red-500">▼ {dropoff}% drop</span>
+                        )}
+                        <span className="text-sm font-bold text-gray-900">{stage.count.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full">
+                      <div
+                        className="h-2 rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: stage.color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Demand Gap - Zero-Result Searches */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">Demand Gaps</h2>
+                <p className="text-sm text-gray-500">Top searches with no results — seller outreach opportunities</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {analytics?.zeroResultSearches?.length === 0 && (
+                <p className="text-sm text-gray-500 py-4 text-center">No zero-result searches yet. Good sign!</p>
+              )}
+              {analytics?.zeroResultSearches?.slice(0, 10).map(({ query, count }) => (
+                <div key={query} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <span className="text-sm text-gray-800 font-medium">&quot;{query}&quot;</span>
+                  <span className="text-xs text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-full">
+                    {count} searches, 0 results
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* User Segments */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">User Segments</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                { key: 'activated_active', label: 'Active Sellers', color: 'bg-green-100 text-green-800' },
+                { key: 'activated_dormant', label: 'Dormant Sellers', color: 'bg-yellow-100 text-yellow-800' },
+                { key: 'never_activated', label: 'Never Listed', color: 'bg-red-100 text-red-800' },
+                { key: 'subscribed', label: 'Subscribed', color: 'bg-indigo-100 text-indigo-800' },
+                { key: 'churned', label: 'Churned', color: 'bg-gray-100 text-gray-700' },
+              ].map(({ key, label, color }) => (
+                <div key={key} className={`rounded-lg p-4 ${color}`}>
+                  <p className="text-2xl font-bold">{analytics?.segments?.[key] ?? '—'}</p>
+                  <p className="text-xs font-medium mt-1">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
 
       {/* Recent Activity */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
