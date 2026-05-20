@@ -127,14 +127,15 @@ export async function getWTPTrend(weeks = 8, campusId = null) {
  * The core funnel: Registered → KYC Verified → Listed → Messaged → Subscribed
  * Returns counts at each stage for the last 30 days cohort.
  */
-export async function getActivationFunnel(campusId = null) {
+export async function getActivationFunnel(campusId = null, campusName = null) {
   try {
     const sinceDate = daysAgoDate(30);
     const since = Timestamp.fromDate(sinceDate);
 
     // Stage 1: Registered users — try Timestamp then ISO string fallback
+    // users.selectedUniversity stores school name, not school doc ID
     let usersBase = adminDb.collection('users');
-    if (campusId) usersBase = usersBase.where('selectedUniversity', '==', campusId);
+    if (campusName) usersBase = usersBase.where('selectedUniversity', '==', campusName);
     const registered = await countWithDateFallback(usersBase, 'createdAt', sinceDate);
 
     // Stage 2: KYC verified — try Timestamp then ISO string fallback
@@ -302,10 +303,11 @@ export async function getZeroResultSearches(campusId = null, days = 7, topN = 20
  * Classify all users into segments for the admin user table.
  * activated_active | activated_dormant | never_activated | subscribed | churned
  */
-export async function getUserSegments(campusId = null) {
+export async function getUserSegments(campusId = null, campusName = null) {
   try {
+    // users.selectedUniversity stores school name, not school doc ID
     let usersQuery = adminDb.collection('users');
-    if (campusId) usersQuery = usersQuery.where('selectedUniversity', '==', campusId);
+    if (campusName) usersQuery = usersQuery.where('selectedUniversity', '==', campusName);
     const usersSnap = await usersQuery.limit(500).get();
 
     // Get users who have listed — read products + services directly (events collection
@@ -443,7 +445,7 @@ export async function getUserSegments(campusId = null) {
 // COMBINED: All analytics for dashboard in one call
 // ─────────────────────────────────────────
 
-export async function getAnalyticsDashboardData(campusId = null) {
+export async function getAnalyticsDashboardData(campusId = null, campusName = null) {
   const [
     wtp,
     wtpTrend,
@@ -454,7 +456,7 @@ export async function getAnalyticsDashboardData(campusId = null) {
   ] = await Promise.all([
     getWeeklyTransactingPairs(campusId),
     getWTPTrend(8, campusId),
-    getActivationFunnel(campusId),
+    getActivationFunnel(campusId, campusName),
     getSellerRetentionRate(campusId),
     getListingToMessageRate(campusId),
     getZeroResultSearches(campusId),

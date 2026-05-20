@@ -19,9 +19,18 @@ export default async function handler(req, res) {
     if (!adminDoc.exists) return res.status(403).json({ error: 'Forbidden' });
 
     const campusId = req.query.campus_id || null;
+
+    // users.selectedUniversity stores the school NAME, not the doc ID.
+    // Resolve the name here so analytics functions can filter users correctly.
+    let campusName = null;
+    if (campusId) {
+      const schoolDoc = await adminDb.collection('schools').doc(campusId).get();
+      campusName = schoolDoc.exists ? schoolDoc.data().name : null;
+    }
+
     const [data, segmentsData] = await Promise.all([
-      getAnalyticsDashboardData(campusId),
-      getUserSegments(campusId),
+      getAnalyticsDashboardData(campusId, campusName),
+      getUserSegments(campusId, campusName),
     ]);
 
     res.status(200).json({ ...data, segments: segmentsData.segments });
