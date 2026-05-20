@@ -44,9 +44,13 @@ export async function sendEmail(templateId, formData) {
     }
 }
 
-// Future Bulk Send Utility (Placeholder)
 export async function sendBulkEmail(formData) {
-    // This will call the future /api/email/send-bulk endpoint
-    console.log('Bulk send utility triggered. Implement API call to /api/email/send-bulk here.');
-    return { status: 'queued', message: 'Bulk job initiated.' };
+    const res = await fetch('/api/email/bulk-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Bulk send failed');
+    return data;
 }
