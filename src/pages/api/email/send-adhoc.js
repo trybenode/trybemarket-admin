@@ -85,10 +85,9 @@ export default async function handler(req, res) {
             const templateCompiler = loadAndCompileTemplate('custom_outreach');
             
             const templateData = {
-                // Pass the custom body and admin name to the template's shell
                 customBody: customBody,
                 adminName: adminName,
-                // Note: We don't fetch user data here; the "Hello User" greeting is generic
+                currentYear: new Date().getFullYear(),
             };
 
             finalSubject = customSubject;

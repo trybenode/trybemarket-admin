@@ -15,6 +15,8 @@ export const allPermissions = [
   "kyc-status",
   "report-review",
   "email-center",
+  "broadcast",
+  "finance",
   "delete-data",
   "feedback",
   "settings",
