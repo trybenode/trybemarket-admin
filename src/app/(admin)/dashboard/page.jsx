@@ -1,10 +1,17 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import PageHeader from '../../../components/PageHeader'
 import { getDashboardStats, getRecentActivity } from '@/utils/dashboard'
 import { getAuth } from 'firebase/auth'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebaseConfig'
+
+const PERIODS = [
+  { key: 'daily', label: 'Daily' },
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'alltime', label: 'All-time' },
+]
 
 export default function Page() {
   const [stats, setStats] = useState({
@@ -16,8 +23,13 @@ export default function Page() {
   });
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('weekly');
+  const [analyticsSummary, setAnalyticsSummary] = useState(null);
+  const [analyticsPages, setAnalyticsPages] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [schools, setSchools] = useState([]);
   const [selectedCampus, setSelectedCampus] = useState(null);
 
@@ -78,6 +90,30 @@ export default function Page() {
       setAnalyticsLoading(false);
     }
   };
+
+  const fetchWebAnalytics = useCallback(async (period) => {
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    try {
+      const [summaryRes, pagesRes] = await Promise.all([
+        fetch(`/api/analytics?period=${period}&type=summary`),
+        fetch(`/api/analytics?period=${period}&type=pages`),
+      ]);
+      if (!summaryRes.ok || !pagesRes.ok) throw new Error('Failed to load analytics');
+      const [summary, pages] = await Promise.all([summaryRes.json(), pagesRes.json()]);
+      setAnalyticsSummary(summary);
+      setAnalyticsPages(pages.pageViews ?? []);
+    } catch (err) {
+      console.error('Analytics fetch error:', err);
+      setAnalyticsError('Could not load web analytics. Check GA4 credentials.');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWebAnalytics(analyticsPeriod);
+  }, [analyticsPeriod, fetchWebAnalytics]);
 
   const getActivityIcon = (type) => {
     switch (type) {
@@ -240,6 +276,87 @@ export default function Page() {
           </div>
         </>
       )}
+
+      {/* Web Analytics */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+          <h2 className="text-lg font-semibold text-gray-800">Web Traffic</h2>
+          <div className="flex gap-1">
+            {PERIODS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setAnalyticsPeriod(key)}
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  analyticsPeriod === key
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {analyticsLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : analyticsError ? (
+          <p className="text-sm text-red-500 text-center py-6">{analyticsError}</p>
+        ) : (
+          <>
+            {/* Summary stat cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-indigo-50 rounded-lg p-4">
+                <p className="text-xs text-indigo-500 font-medium uppercase tracking-wide mb-1">Page Views</p>
+                <p className="text-2xl font-bold text-indigo-700">
+                  {analyticsSummary?.pageViews?.toLocaleString() ?? '—'}
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-xs text-purple-500 font-medium uppercase tracking-wide mb-1">Unique Visitors</p>
+                <p className="text-2xl font-bold text-purple-700">
+                  {analyticsSummary?.uniqueVisitors?.toLocaleString() ?? '—'}
+                </p>
+              </div>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-xs text-blue-500 font-medium uppercase tracking-wide mb-1">Sessions</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {analyticsSummary?.sessions?.toLocaleString() ?? '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Top pages table */}
+            {analyticsPages.length > 0 ? (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Top Pages</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 uppercase">Page</th>
+                        <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Views</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analyticsPages.map((row, i) => (
+                        <tr key={row.page} className={i % 2 === 0 ? 'bg-gray-50' : ''}>
+                          <td className="py-2 px-3 text-gray-700 truncate max-w-xs">{row.page}</td>
+                          <td className="py-2 px-3 text-right font-medium text-gray-900">{row.views.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-4">No page data available for this period.</p>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Analytics Section */}
       {analyticsLoading ? (
