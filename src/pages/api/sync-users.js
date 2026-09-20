@@ -1,9 +1,14 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAdminPages } from "@/lib/requireAdmin";
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  // The response contains every user's email and name — admin-only.
+  const admin = await requireAdminPages(req, res);
+  if (!admin) return;
 
   try {
     const db = adminDb;

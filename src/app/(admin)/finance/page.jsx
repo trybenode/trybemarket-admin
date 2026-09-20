@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/utils/authedFetch';
 import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from '../../../components/PageHeader';
 import { useAuth } from '@/context/AuthContext';
@@ -95,7 +96,7 @@ export default function FinancePage() {
   // ─── Data fetching ───
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch('/api/finance/summary');
+      const res = await authedFetch('/api/finance/summary');
       const data = await res.json();
       if (data.success) setSummary(data);
     } catch (err) {
@@ -111,7 +112,7 @@ export default function FinancePage() {
       if (filterMonth) params.set('month', filterMonth);
       if (filterYear) params.set('year', filterYear);
 
-      const res = await fetch(`/api/finance/transactions?${params.toString()}`);
+      const res = await authedFetch(`/api/finance/transactions?${params.toString()}`);
       const data = await res.json();
       if (data.success) setTransactions(data.transactions || []);
     } catch (err) {
@@ -134,15 +135,14 @@ export default function FinancePage() {
     setFormErr('');
 
     try {
-      const res = await fetch('/api/finance/transactions', {
+      // Who added it (name/uid/role) is filled in server-side from the verified
+      // token — never sent from here, where it could be forged.
+      const res = await authedFetch('/api/finance/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
           amount: Number(form.amount),
-          addedBy: adminData?.name || 'Admin',
-          addedByRole: adminData?.role || '',
-          addedByUid: user?.uid || '',
         }),
       });
 
@@ -175,8 +175,8 @@ export default function FinancePage() {
     if (!confirm('Are you sure you want to delete this transaction?')) return;
     setDeleting(id);
     try {
-      const res = await fetch(
-        `/api/finance/transactions?id=${id}&role=${adminData?.role}`,
+      const res = await authedFetch(
+        `/api/finance/transactions?id=${id}`,
         { method: 'DELETE' }
       );
       const data = await res.json();

@@ -1,4 +1,5 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data'
+import { requireAdminPages } from '@/lib/requireAdmin'
 
 const analyticsClient = new BetaAnalyticsDataClient({
   credentials: {
@@ -17,6 +18,9 @@ const PERIOD_RANGES = {
 }
 
 export default async function handler(req, res) {
+  const admin = await requireAdminPages(req, res)
+  if (!admin) return
+
   const period = PERIOD_RANGES[req.query.period] ? req.query.period : 'weekly'
   const type = req.query.type === 'pages' ? 'pages' : 'summary'
   const dateRange = PERIOD_RANGES[period]

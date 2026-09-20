@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 import { adminDb } from "@/lib/firebaseAdmin"; 
+import { requireAdminPages } from "@/lib/requireAdmin";
 
 // --- A. Nodemailer Configuration ---
 const transporter = nodemailer.createTransport({
@@ -32,12 +33,17 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
+    // Admin-only: this sends email from the company SMTP account to any address.
+    // The sender name is the verified admin's, never a client-supplied one.
+    const admin = await requireAdminPages(req, res);
+    if (!admin) return;
+    const adminName = admin.name;
+
     // Collect all possible data fields from the frontend payload
     const { 
         templateId, // MUST be passed from frontend
         productId, delistReason, 
         recipient, customSubject, customBody,
-        adminName 
     } = req.body;
 
     let finalSubject, finalBody, toEmail;

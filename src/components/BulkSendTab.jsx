@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/utils/authedFetch';
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Users, Loader2, Mail, RefreshCw } from 'lucide-react';
 import Select from 'react-select';
@@ -72,7 +73,7 @@ export default function BulkSendTab() {
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/sync-users', { method: 'POST' });
+      const response = await authedFetch('/api/sync-users', { method: 'POST' });
       const data = await response.json();
       
       if (data.success) {

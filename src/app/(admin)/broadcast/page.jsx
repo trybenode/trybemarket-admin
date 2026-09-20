@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/utils/authedFetch';
 import React, { useState, useEffect, useCallback } from 'react';
 import PageHeader from '../../../components/PageHeader';
 import { useAuth } from '@/context/AuthContext';
@@ -128,7 +129,7 @@ export default function BroadcastPage() {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch('/api/broadcast/history?limit=20');
+      const res = await authedFetch('/api/broadcast/history?limit=20');
       const data = await res.json();
       if (data.success) setHistory(data.logs || []);
     } catch (err) {
@@ -184,11 +185,10 @@ export default function BroadcastPage() {
       title: title || 'TrybeMarket',
       subject: subject || title || 'Message from TrybeMarket',
       body,
-      adminName: adminData?.name || 'Admin',
     };
 
     try {
-      const res = await fetch('/api/broadcast/send', {
+      const res = await authedFetch('/api/broadcast/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
