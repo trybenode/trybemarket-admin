@@ -1,4 +1,5 @@
 'use client'
+import { authedFetch } from '@/utils/authedFetch';
 import React, { useState, useEffect, useCallback } from 'react'
 import PageHeader from '../../../components/PageHeader'
 import { getDashboardStats, getRecentActivity } from '@/utils/dashboard'
@@ -96,8 +97,8 @@ export default function Page() {
     setAnalyticsError(null);
     try {
       const [summaryRes, pagesRes] = await Promise.all([
-        fetch(`/api/analytics?period=${period}&type=summary`),
-        fetch(`/api/analytics?period=${period}&type=pages`),
+        authedFetch(`/api/analytics?period=${period}&type=summary`),
+        authedFetch(`/api/analytics?period=${period}&type=pages`),
       ]);
       if (!summaryRes.ok || !pagesRes.ok) throw new Error('Failed to load analytics');
       const [summary, pages] = await Promise.all([summaryRes.json(), pagesRes.json()]);

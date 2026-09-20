@@ -1,3 +1,5 @@
+import { authedFetch } from '@/utils/authedFetch';
+
 /**
  * Sends a request to the Next.js API route to initiate an email send operation.
  * * @param {string} templateId - The type of email being sent (e.g., 'PRODUCT_DELIST', 'CUSTOM_OUTREACH').
@@ -19,7 +21,7 @@ export async function sendEmail(templateId, formData) {
     };
 
     try {
-        const response = await fetch(endpoint, {
+        const response = await authedFetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -45,7 +47,7 @@ export async function sendEmail(templateId, formData) {
 }
 
 export async function sendBulkEmail(formData) {
-    const res = await fetch('/api/email/bulk-send', {
+    const res = await authedFetch('/api/email/bulk-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

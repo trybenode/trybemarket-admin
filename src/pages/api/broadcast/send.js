@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAdminPages } from "@/lib/requireAdmin";
 import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
@@ -266,13 +267,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
+  // Broadcasts reach every user on push, email and WhatsApp from the real
+  // sender accounts — admin-only, and the sender name is the verified
+  // admin's, never a client-supplied one.
+  const admin = await requireAdminPages(req, res);
+  if (!admin) return;
+  const adminName = admin.name;
+
   const {
     channels = [],    // ["push", "email", "whatsapp"]
     audience = {},    // { type: "all" | "segment" | "individual", segment?, university?, userIds? }
     subject = "",     // Email subject
     title = "",       // Push notification title
     body = "",        // Message body (shared across channels)
-    adminName = "",   // Who sent it
   } = req.body;
 
   if (!channels.length) {
@@ -364,6 +371,7 @@ export default async function handler(req, res) {
       subject: subject || title || "Broadcast",
       body: body.substring(0, 500),
       adminName,
+      adminUid: admin.uid,
       recipientCount: users.length,
       results,
       totalSent,

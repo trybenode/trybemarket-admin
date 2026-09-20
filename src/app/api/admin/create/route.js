@@ -13,7 +13,8 @@ import { NextResponse } from 'next/server';
  *   email: string,
  *   password: string,
  *   displayName: string,
- *   role: 'admin' | 'super-admin' (optional, defaults to 'admin')
+ *   role: 'admin' | 'support' | 'reviewer' | 'operations' | 'super-admin' (optional, defaults to 'admin';
+ *         'super-admin' and 'operations' can only be assigned by a super-admin)
  * }
  * 
  * Request headers:
@@ -29,6 +30,13 @@ import { NextResponse } from 'next/server';
  *   error: string (on failure)
  * }
  */
+// Roles an ordinary `admin` may hand out. `super-admin` (full control) and
+// `operations` (can write finance records) are privileged: only a super-admin
+// may create them, otherwise any admin could promote themselves or an
+// accomplice — the role in the request body was previously stored as-is.
+const ADMIN_ASSIGNABLE_ROLES = ['admin', 'support', 'reviewer'];
+const ALL_ROLES = [...ADMIN_ASSIGNABLE_ROLES, 'super-admin', 'operations'];
+
 export async function POST(request) {
   try {
     // Verify authorization header
@@ -61,7 +69,7 @@ export async function POST(request) {
 
     // Check if requesting user is an admin
     const requesterAdminDoc = await adminDb.collection('admins').doc(decodedToken.uid).get();
-    if (!requesterAdminDoc.exists()) {
+    if (!requesterAdminDoc.exists) {
       return NextResponse.json(
         {
           success: false,
@@ -84,6 +92,25 @@ export async function POST(request) {
 
     // Parse request body
     const { email, password, displayName, role = 'admin' } = await request.json();
+
+    if (!ALL_ROLES.includes(role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid role. Must be one of: ${ALL_ROLES.join(', ')}`
+        },
+        { status: 400 }
+      );
+    }
+    if (requesterRole !== 'super-admin' && !ADMIN_ASSIGNABLE_ROLES.includes(role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Only a super-admin can create super-admin or operations accounts'
+        },
+        { status: 403 }
+      );
+    }
 
     // Validate required fields
     if (!email || !password || !displayName) {

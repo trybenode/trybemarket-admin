@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAdminPages } from "@/lib/requireAdmin";
 import nodemailer from "nodemailer";
 import path from "path";
 import fs from "fs";
@@ -26,7 +27,13 @@ const loadAndCompileTemplate = (templateName) => {
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { target, selectedEmails, subject, body, adminName } = req.body;
+  // Admin-only: emails every user (or any list) from the company SMTP account.
+  // The sender name is the verified admin's, never a client-supplied one.
+  const admin = await requireAdminPages(req, res);
+  if (!admin) return;
+  const adminName = admin.name;
+
+  const { target, selectedEmails, subject, body } = req.body;
 
   if (!subject?.trim() || !body?.trim()) {
     return res.status(400).json({ error: "Subject and body are required." });

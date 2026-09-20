@@ -1,9 +1,13 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAdminPages } from "@/lib/requireAdmin";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
+
+  const admin = await requireAdminPages(req, res);
+  if (!admin) return;
 
   try {
     const limit = parseInt(req.query.limit) || 20;

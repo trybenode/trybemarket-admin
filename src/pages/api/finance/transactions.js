@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAdminPages } from "@/lib/requireAdmin";
 
 const COLLECTION = "financeTransactions";
 
@@ -6,16 +7,19 @@ const COLLECTION = "financeTransactions";
 const WRITE_ROLES = ["super-admin", "operations"];
 
 export default async function handler(req, res) {
-  if (req.method === "GET") {
-    return handleGet(req, res);
+  if (!["GET", "POST", "DELETE"].includes(req.method)) {
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
-  if (req.method === "POST") {
-    return handlePost(req, res);
-  }
-  if (req.method === "DELETE") {
-    return handleDelete(req, res);
-  }
-  return res.status(405).json({ error: "Method Not Allowed" });
+
+  // Any admin may read; write permission is decided below from the VERIFIED
+  // admin's own role. It used to be decided from a `role` the browser sent in
+  // the request, which anyone could set to "super-admin" — with no login at all.
+  const admin = await requireAdminPages(req, res);
+  if (!admin) return;
+
+  if (req.method === "GET") return handleGet(req, res);
+  if (req.method === "POST") return handlePost(req, res, admin);
+  return handleDelete(req, res, admin);
 }
 
 // ─── GET: List transactions with optional filters ───
@@ -64,7 +68,7 @@ async function handleGet(req, res) {
 }
 
 // ─── POST: Add a new transaction ───
-async function handlePost(req, res) {
+async function handlePost(req, res, admin) {
   try {
     const {
       type,         // "income" | "expense"
@@ -73,14 +77,11 @@ async function handlePost(req, res) {
       description,  // what was it for
       reference,    // receipt number, invoice, etc.
       date,         // ISO date string
-      addedBy,      // admin name
-      addedByRole,  // admin role
-      addedByUid,   // admin uid
       notes,        // optional extra notes
     } = req.body;
 
-    // Role check
-    if (!WRITE_ROLES.includes(addedByRole)) {
+    // Role check — the verified admin's role, not anything in the request body
+    if (!WRITE_ROLES.includes(admin.role)) {
       return res.status(403).json({
         error: "You don't have permission to add financial records",
       });
@@ -111,9 +112,9 @@ async function handlePost(req, res) {
       reference: reference?.trim() || "",
       date,
       notes: notes?.trim() || "",
-      addedBy: addedBy || "Unknown",
-      addedByUid: addedByUid || "",
-      addedByRole: addedByRole || "",
+      addedBy: admin.name,
+      addedByUid: admin.uid,
+      addedByRole: admin.role,
       createdAt: new Date().toISOString(),
     };
 
@@ -133,11 +134,11 @@ async function handlePost(req, res) {
 }
 
 // ─── DELETE: Remove a transaction ───
-async function handleDelete(req, res) {
+async function handleDelete(req, res, admin) {
   try {
-    const { id, role } = req.query;
+    const { id } = req.query;
 
-    if (!WRITE_ROLES.includes(role)) {
+    if (!WRITE_ROLES.includes(admin.role)) {
       return res.status(403).json({
         error: "You don't have permission to delete financial records",
       });
