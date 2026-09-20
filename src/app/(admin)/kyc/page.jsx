@@ -77,9 +77,9 @@ function Page() {
       setProcessing(true);
       
       if (newStatus === 'Approved') {
-        await approveKYCRequest(requestId, user.uid);
+        await approveKYCRequest(requestId);
       } else if (newStatus === 'Rejected') {
-        await rejectKYCRequest(requestId, user.uid, "Admin rejected the request");
+        await rejectKYCRequest(requestId, "Admin rejected the request");
       }
       
       // Refresh the data after status change
@@ -89,7 +89,9 @@ function Page() {
       alert(`KYC request has been ${newStatus.toLowerCase()} successfully!`);
     } catch (error) {
       console.error("Error updating KYC status:", error);
-      alert("Failed to update KYC status. Please try again.");
+      // The server explains why (e.g. the matric number already belongs to another
+      // verified account), so show that rather than a generic failure.
+      alert(error.message || "Failed to update KYC status. Please try again.");
     } finally {
       setProcessing(false);
     }

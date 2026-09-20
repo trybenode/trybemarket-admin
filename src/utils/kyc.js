@@ -13,7 +13,7 @@ import {
   Timestamp,
   serverTimestamp 
 } from "firebase/firestore";
-import { db } from "@/lib/firebaseConfig";
+import { db, auth } from "@/lib/firebaseConfig";
 
 /**
  * Get all KYC requests from Firestore
@@ -133,74 +133,57 @@ export const getKYCRequestsByUserId = async (userId) => {
 };
 
 /**
- * Update KYC request status (Verify or Reject)
- * @param {string} requestId - The ID of the KYC request
- * @param {string} newStatus - The new status ('verified' or 'rejected')
- * @param {string} adminId - The ID of the admin making the change
- * @param {string} reason - Optional reason for rejection
- * @returns {Promise<Object>} Updated KYC request object
+ * Records a manual KYC decision through the web app's server
+ * (/api/kyc/decision -> web app /api/admin/kyc/decision).
+ *
+ * This used to write kycRequests.status straight from the browser, which never
+ * set users.isVerified (only the server can), so an "approved" student showed
+ * as Verified while getting no verified status, no 150 credit, no badge and no
+ * CRSA referral count. Approving now runs the real verification transaction,
+ * including the one-matric-one-account check — so it can legitimately fail
+ * (e.g. the matric already belongs to another verified account); the server's
+ * message is thrown as-is so the admin sees why.
+ *
+ * @param {string} requestId - The KYC request id (same as the user's uid)
+ * @param {"approve"|"reject"} decision
+ * @param {string} [reason] - Rejection reason
  */
-export const updateKYCStatus = async (requestId, newStatus, adminId, reason = null) => {
-  try {
-    const kycDoc = doc(db, "kycRequests", requestId);
-    
-    const updateData = {
-      status: newStatus,
-      reviewedBy: adminId,
-      reviewedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-    
-    // Add rejection reason if provided
-    if (newStatus === "rejected" && reason) {
-      updateData.rejectionReason = reason;
-    }
-    
-    await updateDoc(kycDoc, updateData);
-    
-    // Get the updated document
-    const updatedDoc = await getDoc(kycDoc);
-    const data = updatedDoc.data();
-    return {
-      id: updatedDoc.id,
-      ...data,
-      submittedDate: data.submittedAt?.toDate?.() || new Date(),
-    };
-  } catch (error) {
-    console.error("Error updating KYC status:", error);
-    throw error;
+async function submitKYCDecision(requestId, decision, reason) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("You must be logged in.");
+
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/kyc/decision", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ userId: requestId, decision, reason }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = typeof data.error === "string" ? data.error : data.error?.message;
+    throw new Error(message || `Request failed (${response.status})`);
   }
+  return data;
+}
+
+/**
+ * Approve/Verify KYC request (server-side — see submitKYCDecision).
+ * @param {string} requestId - The ID of the KYC request
+ * @returns {Promise<Object>} { status, referralCounted, emailSent, alreadyVerified? }
+ */
+export const approveKYCRequest = async (requestId) => {
+  return submitKYCDecision(requestId, "approve");
 };
 
 /**
- * Approve/Verify KYC request
+ * Reject KYC request (server-side — see submitKYCDecision).
  * @param {string} requestId - The ID of the KYC request
- * @param {string} adminId - The ID of the admin approving the request
- * @returns {Promise<Object>} Updated KYC request object
- */
-export const approveKYCRequest = async (requestId, adminId) => {
-  try {
-    return await updateKYCStatus(requestId, "verified", adminId);
-  } catch (error) {
-    console.error("Error approving KYC request:", error);
-    throw error;
-  }
-};
-
-/**
- * Reject KYC request
- * @param {string} requestId - The ID of the KYC request
- * @param {string} adminId - The ID of the admin rejecting the request
  * @param {string} reason - Reason for rejection
- * @returns {Promise<Object>} Updated KYC request object
+ * @returns {Promise<Object>} { status, emailSent }
  */
-export const rejectKYCRequest = async (requestId, adminId, reason) => {
-  try {
-    return await updateKYCStatus(requestId, "rejected", adminId, reason);
-  } catch (error) {
-    console.error("Error rejecting KYC request:", error);
-    throw error;
-  }
+export const rejectKYCRequest = async (requestId, reason) => {
+  return submitKYCDecision(requestId, "reject", reason);
 };
 
 /**
