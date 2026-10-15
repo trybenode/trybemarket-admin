@@ -1,6 +1,6 @@
 'use client'
 import { authedFetch } from '@/utils/authedFetch';
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import PageHeader from '../../../components/PageHeader'
 import { getDashboardStats, getRecentActivity } from '@/utils/dashboard'
 import { getAuth } from 'firebase/auth'
@@ -8,10 +8,10 @@ import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebaseConfig'
 
 const PERIODS = [
-  { key: 'daily', label: 'Daily' },
-  { key: 'weekly', label: 'Weekly' },
-  { key: 'monthly', label: 'Monthly' },
-  { key: 'alltime', label: 'All-time' },
+  { key: 'daily', label: 'Daily', range: 'Today so far' },
+  { key: 'weekly', label: 'Weekly', range: 'Last 7 days, including today' },
+  { key: 'monthly', label: 'Monthly', range: 'Last 30 days, including today' },
+  { key: 'alltime', label: 'All-time', range: 'Since tracking began' },
 ]
 
 export default function Page() {
@@ -29,7 +29,9 @@ export default function Page() {
   const [analyticsSummary, setAnalyticsSummary] = useState(null);
   const [analyticsPages, setAnalyticsPages] = useState([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [webAnalyticsLoading, setWebAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState(null);
+  const webAnalyticsRequestId = useRef(0);
   const [analytics, setAnalytics] = useState(null);
   const [schools, setSchools] = useState([]);
   const [selectedCampus, setSelectedCampus] = useState(null);
@@ -93,7 +95,12 @@ export default function Page() {
   };
 
   const fetchWebAnalytics = useCallback(async (period) => {
-    setAnalyticsLoading(true);
+    // Switching periods quickly fires overlapping requests; only the latest
+    // one may update state, so a slow older response can't overwrite it.
+    const requestId = ++webAnalyticsRequestId.current;
+    const isLatest = () => requestId === webAnalyticsRequestId.current;
+
+    setWebAnalyticsLoading(true);
     setAnalyticsError(null);
     try {
       const [summaryRes, pagesRes] = await Promise.all([
@@ -102,13 +109,15 @@ export default function Page() {
       ]);
       if (!summaryRes.ok || !pagesRes.ok) throw new Error('Failed to load analytics');
       const [summary, pages] = await Promise.all([summaryRes.json(), pagesRes.json()]);
+      if (!isLatest()) return;
       setAnalyticsSummary(summary);
       setAnalyticsPages(pages.pageViews ?? []);
     } catch (err) {
+      if (!isLatest()) return;
       console.error('Analytics fetch error:', err);
       setAnalyticsError('Could not load web analytics. Check GA4 credentials.');
     } finally {
-      setAnalyticsLoading(false);
+      if (isLatest()) setWebAnalyticsLoading(false);
     }
   }, []);
 
@@ -281,7 +290,12 @@ export default function Page() {
       {/* Web Analytics */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-          <h2 className="text-lg font-semibold text-gray-800">Web Traffic</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">Web Traffic</h2>
+            <p className="text-sm text-gray-500">
+              {PERIODS.find(p => p.key === analyticsPeriod)?.range} · All campuses (Google Analytics; recent hours may lag)
+            </p>
+          </div>
           <div className="flex gap-1">
             {PERIODS.map(({ key, label }) => (
               <button
@@ -299,7 +313,7 @@ export default function Page() {
           </div>
         </div>
 
-        {analyticsLoading ? (
+        {webAnalyticsLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           </div>
