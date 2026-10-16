@@ -424,5 +424,7 @@ export async function getAnalyticsDashboardData(campusId = null, campusName = nu
     listingToMessageRate: getListingToMessageRate(listings, conversations),
     zeroResultSearches: searchData.zeroResultSearches,
     searchesTracked: searchData.searchesTracked,
+    // All campuses, like the other stat cards — not narrowed by the campus filter.
+    activePaidSubscribers: activeSubscribers.size,
   };
 }

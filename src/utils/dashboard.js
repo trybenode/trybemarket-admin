@@ -74,42 +74,6 @@ export const getTotalServices = async () => {
 };
 
 /**
- * Get count of active monthly subscriptions
- * @returns {Promise<number>} Number of active monthly subscriptions
- */
-export const getActiveMonthlySubscriptions = async () => {
-  try {
-    const subscriptionsCollection = collection(db, "subscriptions");
-    const q = query(
-      subscriptionsCollection,
-      where("status", "==", "active"),
-      where("interval", "==", "month")
-    );
-    const snapshot = await getCountFromServer(q);
-    return snapshot.data().count;
-  } catch (error) {
-    console.error("Error fetching active monthly subscriptions:", error);
-    throw error;
-  }
-};
-
-/**
- * Get all active subscriptions (monthly and yearly)
- * @returns {Promise<number>} Number of all active subscriptions
- */
-export const getTotalActiveSubscriptions = async () => {
-  try {
-    const subscriptionsCollection = collection(db, "subscriptions");
-    const q = query(subscriptionsCollection, where("status", "==", "active"));
-    const snapshot = await getCountFromServer(q);
-    return snapshot.data().count;
-  } catch (error) {
-    console.error("Error fetching total active subscriptions:", error);
-    throw error;
-  }
-};
-
-/**
  * Calculate total revenue from orders
  * @returns {Promise<number>} Total revenue generated
  */
@@ -300,16 +264,15 @@ export const getDashboardStats = async () => {
       totalSchools,
       totalProducts,
       totalServices,
-      activeSubscriptions,
-      monthlySubscriptions,
     ] = await Promise.all([
       getTotalUsers(),
       getTotalSchools(),
       getTotalProducts(),
       getTotalServices(),
-      getTotalActiveSubscriptions(),
-      getActiveMonthlySubscriptions(),
     ]);
+    // Active paid subscribers come from /api/analytics-dashboard
+    // (activePaidSubscribers): subscription docs have no status/interval
+    // fields to query, so they're classified server-side instead.
 
     return {
       users: {
@@ -323,10 +286,6 @@ export const getDashboardStats = async () => {
       },
       services: {
         total: totalServices,
-      },
-      subscriptions: {
-        total: activeSubscriptions,
-        monthly: monthlySubscriptions,
       },
     };
   } catch (error) {

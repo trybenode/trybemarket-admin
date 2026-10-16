@@ -20,7 +20,6 @@ export default function Page() {
     schools: { total: 0 },
     products: { total: 0 },
     services: { total: 0 },
-    subscriptions: { total: 0, monthly: 0 },
   });
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -269,7 +268,7 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Stat Card 5 - Active Subscriptions */}
+            {/* Stat Card 5 - Active Paid Subscribers (all campuses, from the analytics API) */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center shrink-0">
@@ -278,8 +277,8 @@ export default function Page() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.subscriptions.monthly.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">Active Monthly Subs</p>
+                  <p className="text-2xl font-bold text-gray-900">{analytics?.activePaidSubscribers?.toLocaleString() ?? '—'}</p>
+                  <p className="text-sm text-gray-600">Active Paid Subscribers</p>
                 </div>
               </div>
             </div>
