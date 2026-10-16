@@ -428,13 +428,13 @@ export default function Page() {
                   `${Math.round((analytics.funnel[1]?.count / analytics.funnel[0]?.count) * 100) || 0}%`
                   : '—'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Registered → KYC verified (30d)</p>
+              <p className="text-xs text-gray-500 mt-1">New sign-ups (30d) who got KYC verified</p>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-600 mb-1">Listing → Message Rate</p>
               <p className="text-3xl font-bold text-gray-900">
-                {analytics?.listingToMessageRate !== undefined ? `${analytics.listingToMessageRate}%` : '—'}
+                {analytics?.listingToMessageRate != null ? `${analytics.listingToMessageRate}%` : '—'}
               </p>
               <p className="text-xs text-gray-500 mt-1">Listings that received a buyer message (30d)</p>
             </div>
@@ -442,7 +442,7 @@ export default function Page() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <p className="text-sm text-gray-600 mb-1">4-Week Seller Retention</p>
               <p className="text-3xl font-bold text-gray-900">
-                {analytics?.retentionRate !== undefined ? `${analytics.retentionRate}%` : '—'}
+                {analytics?.retentionRate != null ? `${analytics.retentionRate}%` : '—'}
               </p>
               <p className="text-xs text-gray-500 mt-1">Week 1 sellers still active in Week 4</p>
             </div>
@@ -450,11 +450,12 @@ export default function Page() {
 
           {/* Activation Funnel */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Activation Funnel (Last 30 Days)</h2>
+            <h2 className="text-lg font-semibold text-gray-800">Activation Funnel</h2>
+            <p className="text-sm text-gray-500 mb-4">People who signed up in the last 30 days, and how many of them reached each step</p>
             <div className="space-y-3">
               {analytics?.funnel?.map((stage, i, arr) => {
-                const pct = i === 0 ? 100 : Math.round((stage.count / arr[0].count) * 100);
-                const dropoff = i > 0 ? Math.round(((arr[i-1].count - stage.count) / arr[i-1].count) * 100) : 0;
+                const pct = arr[0].count > 0 ? Math.round((stage.count / arr[0].count) * 100) : 0;
+                const dropoff = i > 0 && arr[i-1].count > 0 ? Math.round(((arr[i-1].count - stage.count) / arr[i-1].count) * 100) : 0;
                 return (
                   <div key={stage.stage}>
                     <div className="flex items-center justify-between mb-1">
@@ -483,12 +484,18 @@ export default function Page() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-800">Demand Gaps</h2>
-                <p className="text-sm text-gray-500">Top searches with no results — seller outreach opportunities</p>
+                <p className="text-sm text-gray-500">Searches with no results in the last 30 days — seller outreach opportunities</p>
               </div>
             </div>
             <div className="space-y-2">
               {analytics?.zeroResultSearches?.length === 0 && (
-                <p className="text-sm text-gray-500 py-4 text-center">No zero-result searches yet. Good sign!</p>
+                <p className="text-sm text-gray-500 py-4 text-center">
+                  {analytics.searchesTracked === 0
+                    ? 'No searches were recorded in the last 30 days, so there is nothing to judge yet.'
+                    : analytics.searchesTracked == null
+                      ? 'Search data could not be loaded.'
+                      : `All ${analytics.searchesTracked} searches in the last 30 days found results.`}
+                </p>
               )}
               {analytics?.zeroResultSearches?.slice(0, 10).map(({ query, count }) => (
                 <div key={query} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">

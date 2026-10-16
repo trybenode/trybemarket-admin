@@ -11,6 +11,7 @@ import {
   getCountFromServer
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
+import { authedFetch } from "@/utils/authedFetch";
 
 /**
  * Get total count of users
@@ -551,10 +552,22 @@ export const getRecentServices = async (limitCount = 10) => {
  * @param {number} limitCount - Number of recent activities to fetch per type
  * @returns {Promise<Array>} Array of recent activity objects sorted by date
  */
+/**
+ * Newest sign-ups, by Firebase Auth creation time (server-side, see
+ * src/pages/api/recent-signups.js). users.createdAt can't be used for this:
+ * Google sign-in used to overwrite it on every login.
+ */
+const getRecentSignups = async (limitCount = 5) => {
+  const response = await authedFetch(`/api/recent-signups?limit=${limitCount}`);
+  if (!response.ok) throw new Error(`Failed to fetch recent signups (${response.status})`);
+  const { signups } = await response.json();
+  return signups.map(s => ({ ...s, createdAt: new Date(s.createdAt) }));
+};
+
 export const getRecentActivity = async (limitCount = 5) => {
   try {
     const [users, products, services] = await Promise.all([
-      getRecentUsers(limitCount),
+      getRecentSignups(limitCount),
       getRecentProducts(limitCount),
       getRecentServices(limitCount),
     ]);
@@ -562,11 +575,10 @@ export const getRecentActivity = async (limitCount = 5) => {
     // Combine and format activities
     const activities = [
       ...users
-        .filter(user => user.createdAt) // Only include users with valid createdAt
         .map(user => ({
           type: 'user',
           action: 'created account',
-          name: user.fullName || user.displayName || user.email || 'Unknown User',
+          name: user.name,
           timestamp: user.createdAt,
           id: user.id,
         })),

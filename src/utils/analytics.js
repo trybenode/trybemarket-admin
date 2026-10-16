@@ -1,5 +1,5 @@
 // src/utils/analytics.js
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
 
 // ─────────────────────────────────────────
@@ -10,18 +10,9 @@ function startOfWeek(weeksAgo = 0) {
   const d = new Date();
   d.setDate(d.getDate() - d.getDay() - weeksAgo * 7); // Sunday
   d.setHours(0, 0, 0, 0);
-  return Timestamp.fromDate(d);
+  return d;
 }
 
-function daysAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  d.setHours(0, 0, 0, 0);
-  return Timestamp.fromDate(d);
-}
-
-// Returns a plain Date — used when querying collections that may store
-// dates as ISO strings instead of Firestore Timestamps (e.g. users.createdAt)
 function daysAgoDate(n) {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -29,22 +20,98 @@ function daysAgoDate(n) {
   return d;
 }
 
+const toDate = (val) => val?.toDate?.() ?? (val ? new Date(val) : null);
+
 /**
- * Query a collection with a date range filter, trying Timestamp first and
- * falling back to ISO string comparison. Handles collections where the date
- * field type is inconsistent across documents.
+ * When an account was really created, from Firebase Auth. users.createdAt is
+ * written by the web app and was overwritten on every Google sign-in, so it
+ * can't be trusted for "when did this person sign up".
  */
-async function countWithDateFallback(baseQuery, field, sinceDate) {
-  const sinceTimestamp = Timestamp.fromDate(sinceDate);
-  const sinceIso = sinceDate.toISOString();
+export async function getAuthCreationTimes() {
+  const times = new Map();
+  let pageToken;
+  do {
+    const result = await adminAuth.listUsers(1000, pageToken);
+    result.users.forEach(u => times.set(u.uid, new Date(u.metadata.creationTime)));
+    pageToken = result.pageToken;
+  } while (pageToken);
+  return times;
+}
 
-  const tsSnap = await baseQuery.where(field, '>=', sinceTimestamp).count().get();
-  const tsCount = tsSnap.data().count;
-  if (tsCount > 0) return tsCount;
+/**
+ * The user IDs on one campus, or null for "all campuses". Most of the data
+ * (KYC requests, subscriptions, listings, conversations) has no reliable
+ * campus field, so the campus filter is applied through the people involved:
+ * users.selectedUniversity holds the school NAME.
+ */
+async function getCampusUserIds(campusName) {
+  if (!campusName) return null;
+  const snap = await adminDb.collection('users')
+    .where('selectedUniversity', '==', campusName).select().get();
+  return new Set(snap.docs.map(d => d.id));
+}
 
-  // Fallback: field stored as ISO string
-  const strSnap = await baseQuery.where(field, '>=', sinceIso).count().get();
-  return strSnap.data().count;
+const inScope = (campusUserIds, uid) => !campusUserIds || (!!uid && campusUserIds.has(uid));
+
+/**
+ * Seller and buyer of a conversation. Newer conversations store them
+ * explicitly; older ones only have product.sellerId and participants.
+ */
+function conversationRoles(c) {
+  const sellerId = c.sellerId || c.product?.sellerId || null;
+  const buyerId = c.buyerId || (c.participants || []).find(p => p && p !== sellerId) || null;
+  return { sellerId, buyerId };
+}
+
+// Subscription docs coexist in 3 formats:
+//  1. New nested: { product: { planId, isActive, expiryDate (Timestamp) }, service, bundle }
+//     top-level planId/isActive are stale legacy fields — ignore them
+//  2. Old flat Premium: { planId: "Premium", isActive: true, expiryDate: Timestamp }
+//  3. Old Freemium: { planId: "Freemium", isActive: false } — no paid plan, skip
+// There is no `status` field, so a status == 'active' query always matches nothing.
+function classifySubscriptions(subSnap) {
+  const now = new Date();
+  const isActivePaidPlan = (plan) => {
+    if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
+    if (plan.category === 'boost') return false; // boosts are one-time, not subscriptions
+    if (!plan.isActive) return false;
+    const expiry = toDate(plan.expiryDate);
+    return Boolean(expiry && expiry > now);
+  };
+  const hadPaidPlan = (plan) => {
+    if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
+    if (plan.category === 'boost') return false;
+    return Boolean(plan.expiryDate);
+  };
+
+  const active = new Set();
+  const churned = new Set();
+  subSnap.forEach(doc => {
+    const data = doc.data();
+    const uid = data.userId || doc.id;
+
+    // Check nested format first (product/service/bundle sub-objects)
+    const hasActiveNested =
+      isActivePaidPlan(data.product) ||
+      isActivePaidPlan(data.service) ||
+      isActivePaidPlan(data.bundle);
+    const hadPaidNested =
+      hadPaidPlan(data.product) ||
+      hadPaidPlan(data.service) ||
+      hadPaidPlan(data.bundle);
+
+    // Check old flat format (top-level planId + expiryDate, no nested objects)
+    const flatPlan = (!data.product && !data.service && !data.bundle) ? data : null;
+    const hasActiveFlat = isActivePaidPlan(flatPlan);
+    const hadPaidFlat = hadPaidPlan(flatPlan);
+
+    if (hasActiveNested || hasActiveFlat) {
+      active.add(uid);
+    } else if (hadPaidNested || hadPaidFlat) {
+      churned.add(uid);
+    }
+  });
+  return { active, churned };
 }
 
 // ─────────────────────────────────────────
@@ -52,71 +119,26 @@ async function countWithDateFallback(baseQuery, field, sinceDate) {
 // ─────────────────────────────────────────
 
 /**
- * Count unique buyer-seller pairs who started a conversation this week.
- * This is the primary health metric for the marketplace.
+ * Unique buyer-seller pairs who started a conversation, this week and for each
+ * of the last `weeks` weeks. Read from the conversation documents themselves:
+ * the CONVERSATION_STARTED event is only logged from product pages, so it
+ * missed most conversations (4 events vs 80 real conversations).
  */
-export async function getWeeklyTransactingPairs(campusId = null) {
-  try {
-    let q = adminDb.collection('events')
-      .where('event_type', '==', 'CONVERSATION_STARTED')
-      .where('timestamp', '>=', startOfWeek());
-
-    if (campusId) q = q.where('campus_id', '==', campusId);
-
-    const snapshot = await q.get();
+function getWeeklyTransactingPairs(conversations, campusUserIds, weeks = 8) {
+  const trend = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const from = startOfWeek(i);
+    const to = i === 0 ? null : startOfWeek(i - 1);
     const pairs = new Set();
-
-    snapshot.forEach(doc => {
-      const d = doc.data();
-      const buyerId = d.user_id;
-      const sellerId = d.metadata?.seller_id;
-      if (buyerId && sellerId) {
-        pairs.add(`${buyerId}_${sellerId}`);
-      }
+    conversations.forEach(c => {
+      if (!c.createdAt || c.createdAt < from || (to && c.createdAt >= to)) return;
+      if (!c.buyerId || !c.sellerId || !inScope(campusUserIds, c.sellerId)) return;
+      pairs.add(`${c.buyerId}_${c.sellerId}`);
     });
-
-    return pairs.size;
-  } catch (error) {
-    console.error('Error fetching WTP:', error);
-    return 0;
+    const label = i === 0 ? 'This week' : i === 1 ? 'Last week' : `${i + 1}w ago`;
+    trend.push({ week: label, pairs: pairs.size });
   }
-}
-
-/**
- * Get WTP for the last N weeks for trend chart.
- * Returns array of { week: 'Week 1', pairs: 24 }
- */
-export async function getWTPTrend(weeks = 8, campusId = null) {
-  try {
-    const results = [];
-
-    for (let i = weeks - 1; i >= 0; i--) {
-      let q = adminDb.collection('events')
-        .where('event_type', '==', 'CONVERSATION_STARTED')
-        .where('timestamp', '>=', startOfWeek(i + 1))
-        .where('timestamp', '<', startOfWeek(i));
-
-      if (campusId) q = q.where('campus_id', '==', campusId);
-
-      const snapshot = await q.get();
-      const pairs = new Set();
-
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        if (d.user_id && d.metadata?.seller_id) {
-          pairs.add(`${d.user_id}_${d.metadata.seller_id}`);
-        }
-      });
-
-      const label = i === 0 ? 'This week' : i === 1 ? 'Last week' : `${i + 1}w ago`;
-      results.push({ week: label, pairs: pairs.size });
-    }
-
-    return results;
-  } catch (error) {
-    console.error('Error fetching WTP trend:', error);
-    return [];
-  }
+  return { wtp: trend[trend.length - 1]?.pairs ?? 0, wtpTrend: trend };
 }
 
 // ─────────────────────────────────────────
@@ -124,60 +146,28 @@ export async function getWTPTrend(weeks = 8, campusId = null) {
 // ─────────────────────────────────────────
 
 /**
- * The core funnel: Registered → KYC Verified → Listed → Messaged → Subscribed
- * Returns counts at each stage for the last 30 days cohort.
+ * Follows one cohort — people who signed up in the last 30 days (by their
+ * Firebase Auth creation time) — and counts how many of THEM reached each
+ * step. Each stage is a subset of "Registered", so the percentages are real
+ * conversion rates.
  */
-export async function getActivationFunnel(campusId = null, campusName = null) {
-  try {
-    const sinceDate = daysAgoDate(30);
-    const since = Timestamp.fromDate(sinceDate);
+function getActivationFunnel({ authTimes, userIds, campusUserIds, verifiedKycUserIds, listers, conversations, activeSubscribers }) {
+  const since = daysAgoDate(30);
+  const cohort = userIds.filter(uid => {
+    const created = authTimes.get(uid);
+    return created && created >= since && inScope(campusUserIds, uid);
+  });
 
-    // Stage 1: Registered users — try Timestamp then ISO string fallback
-    // users.selectedUniversity stores school name, not school doc ID
-    let usersBase = adminDb.collection('users');
-    if (campusName) usersBase = usersBase.where('selectedUniversity', '==', campusName);
-    const registered = await countWithDateFallback(usersBase, 'createdAt', sinceDate);
+  const sellersMessaged = new Set(conversations.map(c => c.sellerId).filter(Boolean));
+  const countIn = (set) => cohort.filter(uid => set.has(uid)).length;
 
-    // Stage 2: KYC verified — try Timestamp then ISO string fallback
-    let kycBase = adminDb.collection('kycRequests').where('status', '==', 'verified');
-    if (campusId) kycBase = kycBase.where('schoolId', '==', campusId);
-    const kycVerified = await countWithDateFallback(kycBase, 'submittedAt', sinceDate);
-
-    // Stage 3: Posted at least one listing (products + services)
-    // Unique sellers who listed (approximate from event log)
-    let listedQuery = adminDb.collection('events')
-      .where('event_type', '==', 'LISTING_CREATED')
-      .where('timestamp', '>=', since);
-    if (campusId) listedQuery = listedQuery.where('campus_id', '==', campusId);
-    const listedSnap = await listedQuery.get();
-    const listedUserIds = new Set(listedSnap.docs.map(d => d.data().user_id));
-    const firstListing = listedUserIds.size;
-
-    // Stage 4: Received first buyer message
-    let convQuery = adminDb.collection('events')
-      .where('event_type', '==', 'CONVERSATION_STARTED')
-      .where('timestamp', '>=', since);
-    if (campusId) convQuery = convQuery.where('campus_id', '==', campusId);
-    const convSnap = await convQuery.get();
-    const sellersMessaged = new Set(convSnap.docs.map(d => d.data().metadata?.seller_id).filter(Boolean));
-    const receivedMessage = sellersMessaged.size;
-
-    // Stage 5: Subscribed — try Timestamp then ISO string fallback
-    let subBase = adminDb.collection('subscriptions').where('status', '==', 'active');
-    if (campusId) subBase = subBase.where('campus_id', '==', campusId);
-    const subscribed = await countWithDateFallback(subBase, 'createdAt', sinceDate);
-
-    return [
-      { stage: 'Registered', count: registered, color: '#6366f1' },
-      { stage: 'KYC Verified', count: kycVerified, color: '#8b5cf6' },
-      { stage: 'First Listing', count: firstListing, color: '#a855f7' },
-      { stage: 'Received Message', count: receivedMessage, color: '#ec4899' },
-      { stage: 'Subscribed', count: subscribed, color: '#f59e0b' },
-    ];
-  } catch (error) {
-    console.error('Error fetching activation funnel:', error);
-    return [];
-  }
+  return [
+    { stage: 'Registered', count: cohort.length, color: '#6366f1' },
+    { stage: 'KYC Verified', count: countIn(verifiedKycUserIds), color: '#8b5cf6' },
+    { stage: 'First Listing', count: countIn(listers), color: '#a855f7' },
+    { stage: 'Received Message', count: countIn(sellersMessaged), color: '#ec4899' },
+    { stage: 'Subscribed', count: countIn(activeSubscribers), color: '#f59e0b' },
+  ];
 }
 
 // ─────────────────────────────────────────
@@ -185,36 +175,16 @@ export async function getActivationFunnel(campusId = null, campusName = null) {
 // ─────────────────────────────────────────
 
 /**
- * Of sellers who posted in Week 1 of a cohort, how many are still posting in Week 4?
- * Returns a percentage.
+ * Of sellers who posted a listing 28–21 days ago, what % also posted in the
+ * last 7 days? null when nobody posted in that first week (nothing to measure).
  */
-export async function getSellerRetentionRate(campusId = null) {
-  try {
-    // Week 1 sellers: posted listing 28-21 days ago
-    let w1Query = adminDb.collection('events')
-      .where('event_type', '==', 'LISTING_CREATED')
-      .where('timestamp', '>=', daysAgo(28))
-      .where('timestamp', '<', daysAgo(21));
-    if (campusId) w1Query = w1Query.where('campus_id', '==', campusId);
-    const w1Snap = await w1Query.get();
-    const week1Sellers = new Set(w1Snap.docs.map(d => d.data().user_id));
-
-    if (week1Sellers.size === 0) return 0;
-
-    // Week 4 active: same sellers who also posted in last 7 days
-    let w4Query = adminDb.collection('events')
-      .where('event_type', '==', 'LISTING_CREATED')
-      .where('timestamp', '>=', daysAgo(7));
-    if (campusId) w4Query = w4Query.where('campus_id', '==', campusId);
-    const w4Snap = await w4Query.get();
-    const week4Sellers = new Set(w4Snap.docs.map(d => d.data().user_id));
-
-    const retained = [...week1Sellers].filter(id => week4Sellers.has(id)).length;
-    return Math.round((retained / week1Sellers.size) * 100);
-  } catch (error) {
-    console.error('Error fetching seller retention:', error);
-    return 0;
-  }
+function getSellerRetentionRate(listings) {
+  const w1Start = daysAgoDate(28), w1End = daysAgoDate(21), w4Start = daysAgoDate(7);
+  const week1 = new Set(listings.filter(l => l.createdAt >= w1Start && l.createdAt < w1End).map(l => l.userId));
+  if (week1.size === 0) return null;
+  const week4 = new Set(listings.filter(l => l.createdAt >= w4Start).map(l => l.userId));
+  const retained = [...week1].filter(uid => week4.has(uid)).length;
+  return Math.round((retained / week1.size) * 100);
 }
 
 // ─────────────────────────────────────────
@@ -222,38 +192,16 @@ export async function getSellerRetentionRate(campusId = null) {
 // ─────────────────────────────────────────
 
 /**
- * Listing-to-message rate: % of listings that received at least one buyer message.
- * Approximate from event data.
+ * % of listings created in the last `days` days that have at least one
+ * conversation about them. null when no listings were created.
  */
-export async function getListingToMessageRate(campusId = null, days = 30) {
-  try {
-    const since = daysAgo(days);
-
-    // Total listings created in period
-    let listingsQuery = adminDb.collection('events')
-      .where('event_type', '==', 'LISTING_CREATED')
-      .where('timestamp', '>=', since);
-    if (campusId) listingsQuery = listingsQuery.where('campus_id', '==', campusId);
-    const listingsSnap = await listingsQuery.count().get();
-    const totalListings = listingsSnap.data().count;
-
-    if (totalListings === 0) return 0;
-
-    // Conversations started (each points to a listing_id)
-    let convQuery = adminDb.collection('events')
-      .where('event_type', '==', 'CONVERSATION_STARTED')
-      .where('timestamp', '>=', since);
-    if (campusId) convQuery = convQuery.where('campus_id', '==', campusId);
-    const convSnap = await convQuery.get();
-    const listingsWithMessages = new Set(
-      convSnap.docs.map(d => d.data().metadata?.listing_id).filter(Boolean)
-    );
-
-    return Math.round((listingsWithMessages.size / totalListings) * 100);
-  } catch (error) {
-    console.error('Error fetching listing-to-message rate:', error);
-    return 0;
-  }
+function getListingToMessageRate(listings, conversations, days = 30) {
+  const since = daysAgoDate(days);
+  const recent = listings.filter(l => l.createdAt >= since);
+  if (recent.length === 0) return null;
+  const messagedListingIds = new Set(conversations.map(c => c.listingId).filter(Boolean));
+  const messaged = recent.filter(l => messagedListingIds.has(l.id)).length;
+  return Math.round((messaged / recent.length) * 100);
 }
 
 // ─────────────────────────────────────────
@@ -261,37 +209,56 @@ export async function getListingToMessageRate(campusId = null, days = 30) {
 // ─────────────────────────────────────────
 
 /**
- * Top search queries that returned zero results.
- * These are your seller outreach opportunities.
+ * Top search queries that returned zero results in the last `days` days.
+ *
+ * The search bar logs whatever is in the box after a 500ms pause, so a slow
+ * typist produces "garr" before "garri". A query is dropped when the same
+ * session later searched a longer query that starts with it.
+ *
+ * Also returns how many searches were tracked at all, so an empty list can
+ * say "no searches" rather than implying there's no unmet demand.
  */
-export async function getZeroResultSearches(campusId = null, days = 7, topN = 20) {
+export async function getZeroResultSearches(campusName = null, days = 30, topN = 20) {
   try {
-    const since = daysAgo(days);
-
-    let q = adminDb.collection('events')
+    const since = Timestamp.fromDate(daysAgoDate(days));
+    const snap = await adminDb.collection('events')
       .where('event_type', '==', 'SEARCH_PERFORMED')
-      .where('timestamp', '>=', since);
-    if (campusId) q = q.where('campus_id', '==', campusId);
+      .where('timestamp', '>=', since)
+      .get();
 
-    const snap = await q.get();
+    // events.campus_id holds the school NAME, not the schools doc ID
+    const searches = snap.docs
+      .map(doc => doc.data())
+      .filter(d => d.metadata?.query && (!campusName || d.campus_id === campusName))
+      .map(d => ({
+        query: d.metadata.query,
+        hasResults: d.metadata.has_results !== false,
+        session: d.metadata.session_id || d.session_id || null,
+      }));
 
-    // Aggregate zero-result searches client-side (Firestore can't do this server-side)
+    const queriesBySession = {};
+    searches.forEach(s => {
+      if (s.session) (queriesBySession[s.session] ||= []).push(s.query);
+    });
+    const isPartial = (s) => (queriesBySession[s.session] || [])
+      .some(q => q.length > s.query.length && q.startsWith(s.query));
+
     const queryMap = {};
-    snap.forEach(doc => {
-      const d = doc.data();
-      if (d.metadata?.has_results === false && d.metadata?.query) {
-        const query = d.metadata.query;
-        queryMap[query] = (queryMap[query] || 0) + 1;
-      }
+    searches.forEach(s => {
+      if (s.hasResults || isPartial(s)) return;
+      queryMap[s.query] = (queryMap[s.query] || 0) + 1;
     });
 
-    return Object.entries(queryMap)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, topN)
-      .map(([query, count]) => ({ query, count }));
+    return {
+      zeroResultSearches: Object.entries(queryMap)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, topN)
+        .map(([query, count]) => ({ query, count })),
+      searchesTracked: searches.length,
+    };
   } catch (error) {
     console.error('Error fetching zero-result searches:', error);
-    return [];
+    return { zeroResultSearches: [], searchesTracked: null };
   }
 }
 
@@ -342,60 +309,15 @@ export async function getUserSegments(campusId = null, campusName = null) {
     ]);
     const recentlyActive = new Set([...recentProductIds, ...recentServiceIds].filter(Boolean));
 
-    // Subscription docs coexist in 3 formats:
-    //  1. New nested: { product: { planId, isActive, expiryDate (Timestamp) }, service, bundle }
-    //     top-level planId/isActive are stale legacy fields — ignore them
-    //  2. Old flat Premium: { planId: "Premium", isActive: true, expiryDate: Timestamp }
-    //  3. Old Freemium: { planId: "Freemium", isActive: false } — no paid plan, skip
-    const now = new Date();
-
     // Build set of in-scope user IDs so campus filter applies to subscription counts too
     const inScopeUsers = new Set();
     usersSnap.forEach(doc => inScopeUsers.add(doc.id));
 
-    const toDate = (val) => val?.toDate?.() ?? (val ? new Date(val) : null);
-    const isActivePaidPlan = (plan) => {
-      if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
-      if (plan.category === 'boost') return false; // boosts are one-time, not subscriptions
-      if (!plan.isActive) return false;
-      const expiry = toDate(plan.expiryDate);
-      return Boolean(expiry && expiry > now);
-    };
-    const hadPaidPlan = (plan) => {
-      if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
-      if (plan.category === 'boost') return false;
-      return Boolean(plan.expiryDate);
-    };
-
     const subSnap = await adminDb.collection('subscriptions').get();
-    const activeSubscribers = new Set();
-    const churned = new Set();
-    subSnap.forEach(doc => {
-      const data = doc.data();
-      const uid = data.userId || doc.id;
-      if (campusId && !inScopeUsers.has(uid)) return;
-
-      // Check nested format first (product/service/bundle sub-objects)
-      const hasActiveNested =
-        isActivePaidPlan(data.product) ||
-        isActivePaidPlan(data.service) ||
-        isActivePaidPlan(data.bundle);
-      const hadPaidNested =
-        hadPaidPlan(data.product) ||
-        hadPaidPlan(data.service) ||
-        hadPaidPlan(data.bundle);
-
-      // Check old flat format (top-level planId + expiryDate, no nested objects)
-      const flatPlan = (!data.product && !data.service && !data.bundle) ? data : null;
-      const hasActiveFlat = isActivePaidPlan(flatPlan);
-      const hadPaidFlat = hadPaidPlan(flatPlan);
-
-      if (hasActiveNested || hasActiveFlat) {
-        activeSubscribers.add(uid);
-      } else if (hadPaidNested || hadPaidFlat) {
-        churned.add(uid);
-      }
-    });
+    const { active: allActive, churned: allChurned } = classifySubscriptions(subSnap);
+    const keep = (uid) => !campusId || inScopeUsers.has(uid);
+    const activeSubscribers = new Set([...allActive].filter(keep));
+    const churned = new Set([...allChurned].filter(keep));
 
     const segments = {
       activated_active: 0,
@@ -445,29 +367,62 @@ export async function getUserSegments(campusId = null, campusName = null) {
 // COMBINED: All analytics for dashboard in one call
 // ─────────────────────────────────────────
 
+/**
+ * Loads the underlying data once and derives every metric from it. Each
+ * collection involved is small (hundreds of docs), so filtering in memory is
+ * cheaper and more reliable than a composite index per metric.
+ */
 export async function getAnalyticsDashboardData(campusId = null, campusName = null) {
   const [
-    wtp,
-    wtpTrend,
-    funnel,
-    retentionRate,
-    listingToMessageRate,
-    zeroResultSearches,
+    authTimes,
+    campusUserIds,
+    usersSnap,
+    kycSnap,
+    productsSnap,
+    servicesSnap,
+    conversationsSnap,
+    subSnap,
+    searchData,
   ] = await Promise.all([
-    getWeeklyTransactingPairs(campusId),
-    getWTPTrend(8, campusId),
-    getActivationFunnel(campusId, campusName),
-    getSellerRetentionRate(campusId),
-    getListingToMessageRate(campusId),
-    getZeroResultSearches(campusId),
+    getAuthCreationTimes(),
+    getCampusUserIds(campusName),
+    adminDb.collection('users').select().get(),
+    adminDb.collection('kycRequests').where('status', '==', 'verified').select('userId').get(),
+    adminDb.collection('products').select('userId', 'createdAt').get(),
+    adminDb.collection('services').select('userId', 'createdAt').get(),
+    adminDb.collection('conversation')
+      .select('createdAt', 'sellerId', 'buyerId', 'participants', 'product').get(),
+    adminDb.collection('subscriptions').get(),
+    getZeroResultSearches(campusName),
   ]);
 
+  const userIds = usersSnap.docs.map(d => d.id);
+  const verifiedKycUserIds = new Set(kycSnap.docs.map(d => d.data().userId).filter(Boolean));
+
+  // Listings from the products/services collections themselves — the web app
+  // never logs a LISTING_CREATED event, so event-based counts were always 0.
+  const listings = [...productsSnap.docs, ...servicesSnap.docs]
+    .map(d => ({ id: d.id, userId: d.data().userId, createdAt: toDate(d.data().createdAt) }))
+    .filter(l => l.userId && l.createdAt && inScope(campusUserIds, l.userId));
+  const listers = new Set(listings.map(l => l.userId));
+
+  const conversations = conversationsSnap.docs
+    .map(d => {
+      const data = d.data();
+      return { ...conversationRoles(data), listingId: data.product?.id || null, createdAt: toDate(data.createdAt) };
+    })
+    .filter(c => inScope(campusUserIds, c.sellerId));
+
+  const { active: activeSubscribers } = classifySubscriptions(subSnap);
+
   return {
-    wtp,
-    wtpTrend,
-    funnel,
-    retentionRate,
-    listingToMessageRate,
-    zeroResultSearches,
+    ...getWeeklyTransactingPairs(conversations, campusUserIds),
+    funnel: getActivationFunnel({
+      authTimes, userIds, campusUserIds, verifiedKycUserIds, listers, conversations, activeSubscribers,
+    }),
+    retentionRate: getSellerRetentionRate(listings),
+    listingToMessageRate: getListingToMessageRate(listings, conversations),
+    zeroResultSearches: searchData.zeroResultSearches,
+    searchesTracked: searchData.searchesTracked,
   };
 }
