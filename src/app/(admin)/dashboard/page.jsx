@@ -493,14 +493,16 @@ export default function Page() {
                     ? 'No searches were recorded in the last 30 days, so there is nothing to judge yet.'
                     : analytics.searchesTracked == null
                       ? 'Search data could not be loaded.'
-                      : `All ${analytics.searchesTracked} searches in the last 30 days found results.`}
+                      : analytics.searchesTracked === 1
+                        ? 'The 1 search in the last 30 days found results.'
+                        : `All ${analytics.searchesTracked} searches in the last 30 days found results.`}
                 </p>
               )}
               {analytics?.zeroResultSearches?.slice(0, 10).map(({ query, count }) => (
                 <div key={query} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <span className="text-sm text-gray-800 font-medium">&quot;{query}&quot;</span>
                   <span className="text-xs text-red-600 font-semibold bg-red-50 px-2 py-1 rounded-full">
-                    {count} searches, 0 results
+                    {count} {count === 1 ? 'search' : 'searches'}, 0 results
                   </span>
                 </div>
               ))}
