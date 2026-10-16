@@ -6,6 +6,8 @@ import { getDashboardStats, getRecentActivity } from '@/utils/dashboard'
 import { getAuth } from 'firebase/auth'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebaseConfig'
+import { FileText, FileJson, Loader2 } from 'lucide-react'
+import { buildDashboardReport, downloadDashboardJson, downloadDashboardPdf } from '@/utils/dashboardExport'
 
 const PERIODS = [
   { key: 'daily', label: 'Daily', range: 'Today so far' },
@@ -34,6 +36,7 @@ export default function Page() {
   const [analytics, setAnalytics] = useState(null);
   const [schools, setSchools] = useState([]);
   const [selectedCampus, setSelectedCampus] = useState(null);
+  const [exporting, setExporting] = useState(null); // 'pdf' | 'json' | null
 
   useEffect(() => {
     fetchDashboardData();
@@ -175,6 +178,32 @@ export default function Page() {
     return `${days} day${days > 1 ? 's' : ''} ago`;
   };
 
+  const isAnythingLoading = loading || analyticsLoading || webAnalyticsLoading;
+
+  const handleExport = async (format) => {
+    setExporting(format);
+    try {
+      const report = buildDashboardReport({
+        stats,
+        analytics,
+        // Only once loaded without error: after a failed request the summary
+        // still holds the previous period's numbers.
+        webTraffic: !webAnalyticsLoading && !analyticsError && analyticsSummary
+          ? { period: analyticsPeriod, summary: analyticsSummary, pages: analyticsPages }
+          : null,
+        activities,
+        campusName: schools.find(s => s.id === selectedCampus)?.name ?? null,
+      });
+      if (format === 'pdf') await downloadDashboardPdf(report);
+      else downloadDashboardJson(report);
+    } catch (error) {
+      console.error(`Dashboard ${format} export failed:`, error);
+      alert(`Could not create the ${format.toUpperCase()} file. Please try again.`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <main className="container mx-auto">
       <div className="space-y-6">
@@ -182,7 +211,7 @@ export default function Page() {
       <PageHeader HeaderText="Welcome to TrybeMarket Admin" SubHeaderText="Manage your schools, KYC verifications, and more from this dashboard." />
 
       {/* Campus Filter */}
-      <div className="flex items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="flex flex-wrap items-center gap-3 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <label className="text-sm font-medium text-gray-700">Filter by Campus:</label>
         <select
           value={selectedCampus || ''}
@@ -198,6 +227,28 @@ export default function Page() {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+
+        {/* Download what's on screen, including the campus filter and web traffic period */}
+        <div className="flex gap-2 sm:ml-auto">
+          {[
+            { format: 'pdf', label: 'Download PDF', Icon: FileText },
+            { format: 'json', label: 'Download JSON', Icon: FileJson },
+          ].map(({ format, label, Icon }) => (
+            <button
+              key={format}
+              type="button"
+              onClick={() => handleExport(format)}
+              disabled={isAnythingLoading || exporting !== null}
+              title={isAnythingLoading ? 'Wait for the dashboard to finish loading' : undefined}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {exporting === format
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Icon className="w-4 h-4" />}
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats Grid */}
