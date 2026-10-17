@@ -122,6 +122,9 @@ export const getSchoolById = async (schoolId) => {
       distinctServiceProviders,
       dateJoined: schoolData.createdAt,
       usersData,
+      // TrybeMarket's own branch at this school (address, support contacts) —
+      // not the university's address, which is `location`.
+      branch: schoolData.branch || null,
     };
   } catch (error) {
     console.error('Error getting school:', error);

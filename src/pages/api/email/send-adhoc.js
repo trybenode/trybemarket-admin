@@ -1,20 +1,13 @@
-import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import Handlebars from 'handlebars';
 import { adminDb } from "@/lib/firebaseAdmin"; 
 import { requireAdminPages } from "@/lib/requireAdmin";
+import { sendEmail } from "@/lib/mailer";
 
-// --- A. Nodemailer Configuration ---
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS.replace(/\s/g, ''), 
-    },
-});
+// --- A. Sending ---
+// Through Resend as TrybeMarket <contact@trybemarket.online> (src/lib/mailer.js).
+// The previous SMTP setup wasn't delivering in production.
 
 // --- B. Template Compilation Utility ---
 const loadAndCompileTemplate = (templateName) => {
@@ -33,7 +26,7 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    // Admin-only: this sends email from the company SMTP account to any address.
+    // Admin-only: this sends email from the company address to any address.
     // The sender name is the verified admin's, never a client-supplied one.
     const admin = await requireAdminPages(req, res);
     if (!admin) return;
@@ -105,21 +98,15 @@ export default async function handler(req, res) {
         }
 
         // --- COMMON EMAIL SEND STEP ---
-        const mailOptions = {
-            from: {
-                name: process.env.SENDER_NAME,
-                address: process.env.SENDER_EMAIL,
-            },
+        const info = await sendEmail({
             to: toEmail,
             subject: finalSubject,
             html: finalBody,
-        };
+        });
 
-        const info = await transporter.sendMail(mailOptions);
-        
-        console.log(`${templateId} email sent: %s`, info.messageId);
+        console.log(`${templateId} email sent: %s`, info.id);
 
-        return res.status(200).json({ message: `${templateId} email sent successfully`, messageId: info.messageId });
+        return res.status(200).json({ message: `${templateId} email sent successfully`, messageId: info.id });
 
     } catch (error) {
         // Log error and return JSON response on crash
