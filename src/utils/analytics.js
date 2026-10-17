@@ -226,10 +226,15 @@ export async function getZeroResultSearches(campusName = null, days = 30, topN =
       .where('timestamp', '>=', since)
       .get();
 
+    // An email address isn't product demand — it's usually the browser
+    // autofilling the user's own email into the search box. Skip those.
+    const looksLikeEmail = (q) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.trim());
+
     // events.campus_id holds the school NAME, not the schools doc ID
     const searches = snap.docs
       .map(doc => doc.data())
-      .filter(d => d.metadata?.query && (!campusName || d.campus_id === campusName))
+      .filter(d => d.metadata?.query && !looksLikeEmail(d.metadata.query))
+      .filter(d => !campusName || d.campus_id === campusName)
       .map(d => ({
         query: d.metadata.query,
         hasResults: d.metadata.has_results !== false,
