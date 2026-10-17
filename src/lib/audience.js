@@ -3,7 +3,7 @@
 // The single source of truth for segments: the dashboard's User Segments and
 // campaign audiences both read from here, so "Dormant Sellers at X" means the
 // same people everywhere.
-import { adminDb } from '@/lib/firebaseAdmin';
+import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export const SEGMENT_KEYS = [
@@ -24,6 +24,22 @@ export const SEGMENT_LABELS = {
 
 // A listing in the last ACTIVE_SELLER_DAYS days makes a seller "active".
 const ACTIVE_SELLER_DAYS = 14;
+
+/**
+ * When an account was really created, from Firebase Auth. users.createdAt is
+ * written by the web app and was overwritten on every Google sign-in, so it
+ * can't be trusted for "when did this person sign up".
+ */
+export async function getAuthCreationTimes() {
+  const times = new Map();
+  let pageToken;
+  do {
+    const result = await adminAuth.listUsers(1000, pageToken);
+    result.users.forEach(u => times.set(u.uid, new Date(u.metadata.creationTime)));
+    pageToken = result.pageToken;
+  } while (pageToken);
+  return times;
+}
 
 const toDate = (val) => val?.toDate?.() ?? (val ? new Date(val) : null);
 
@@ -160,4 +176,86 @@ export async function getSchoolsInUse() {
   return [...counts.entries()]
     .map(([name, users]) => ({ name, users }))
     .sort((a, b) => b.users - a.users);
+}
+
+// ─────────────────────────────────────────
+// CAMPAIGN AUDIENCES (08-campaign-messaging.md §4)
+// ─────────────────────────────────────────
+
+// Sentinel for "users with no school set" in a schools filter.
+export const NO_SCHOOL = '__none__';
+
+// Nigerian mobile, stored as 234XXXXXXXXXX (no "+").
+const WHATSAPP_NUMBER_RE = /^234[789]\d{9}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Everyone matching an audience, with the channels each person can be
+ * reached on:
+ *   audience = {
+ *     segments: ['activated_dormant', ...] | [] (= all segments),
+ *     schools:  ['Lead City University of Ibadan', NO_SCHOOL, ...] | [] (= all),
+ *     kyc: 'verified' | 'unverified' | null,
+ *     signedUpWithinDays: number | null,
+ *   }
+ * Returns [{ uid, fullName, school, segment, email, phone, emailEligible,
+ *            whatsappEligible }] — people reachable on neither channel are
+ * still included (eligible flags false), so counts can say why.
+ *
+ * Always excluded: accounts with a data-deletion request.
+ * Email needs a valid address and no marketingEmailOptOut.
+ * WhatsApp needs a valid number and the explicit whatsappMarketing opt-in.
+ */
+export async function getCampaignAudience(audience = {}) {
+  const segments = Array.isArray(audience.segments) ? audience.segments : [];
+  const schools = Array.isArray(audience.schools) ? audience.schools : [];
+  const kyc = audience.kyc === 'verified' || audience.kyc === 'unverified' ? audience.kyc : null;
+  const withinDays = Number(audience.signedUpWithinDays) > 0 ? Number(audience.signedUpWithinDays) : null;
+
+  const [users, deletionSnap, kycSnap, authTimes] = await Promise.all([
+    getSegmentedUsers(),
+    adminDb.collection('dataDeletionRequests').select('email').get(),
+    kyc ? adminDb.collection('kycRequests').where('status', '==', 'verified').select('userId').get() : null,
+    withinDays ? getAuthCreationTimes() : null,
+  ]);
+
+  const deletionEmails = new Set(
+    deletionSnap.docs.map(d => String(d.data().email || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const kycVerified = kycSnap ? new Set(kycSnap.docs.map(d => d.data().userId).filter(Boolean)) : null;
+  const signedUpSince = withinDays ? Date.now() - withinDays * 24 * 60 * 60 * 1000 : null;
+
+  return users
+    .filter(({ id, data, segment }) => {
+      if (segments.length && !segments.includes(segment)) return false;
+      if (schools.length) {
+        const school = data.selectedUniversity || NO_SCHOOL;
+        if (!schools.includes(school)) return false;
+      }
+      if (kyc) {
+        const verified = data.isVerified === true || kycVerified.has(id);
+        if (kyc === 'verified' ? !verified : verified) return false;
+      }
+      if (signedUpSince) {
+        const created = authTimes.get(id);
+        if (!created || created.getTime() < signedUpSince) return false;
+      }
+      const email = String(data.email || '').trim().toLowerCase();
+      if (email && deletionEmails.has(email)) return false;
+      return true;
+    })
+    .map(({ id, data, segment }) => {
+      const email = String(data.email || '').trim();
+      const phone = String(data.phone || '').replace(/\D/g, '');
+      return {
+        uid: id,
+        fullName: data.fullName || '',
+        school: data.selectedUniversity || '',
+        segment,
+        email: EMAIL_RE.test(email) ? email : null,
+        phone: WHATSAPP_NUMBER_RE.test(phone) ? phone : null,
+        emailEligible: EMAIL_RE.test(email) && data.marketingEmailOptOut !== true,
+        whatsappEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappMarketing === true,
+      };
+    });
 }
