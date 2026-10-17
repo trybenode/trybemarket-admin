@@ -88,7 +88,8 @@ export async function getEmailUsageToday() {
 
 // Takes up to `wanted` emails from today's allowance and returns how many were
 // granted. Not handed back if a send then fails — erring on sending fewer.
-async function reserveEmails(wanted) {
+// Test sends use it too: they count against Resend's daily limit like any email.
+export async function reserveEmails(wanted) {
   const { emailDailyAllowance } = await getCampaignSettings();
   return adminDb.runTransaction(async (tx) => {
     const ref = usageRef();
