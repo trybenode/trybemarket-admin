@@ -1,7 +1,10 @@
 // src/utils/analytics.js
-import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
+import { adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
-import { classifySubscriptions, getSegmentedUsers } from '@/lib/audience';
+import { classifySubscriptions, getSegmentedUsers, getAuthCreationTimes } from '@/lib/audience';
+
+// Re-exported for existing callers (src/pages/api/recent-signups.js).
+export { getAuthCreationTimes };
 
 // ─────────────────────────────────────────
 // HELPERS
@@ -22,22 +25,6 @@ function daysAgoDate(n) {
 }
 
 const toDate = (val) => val?.toDate?.() ?? (val ? new Date(val) : null);
-
-/**
- * When an account was really created, from Firebase Auth. users.createdAt is
- * written by the web app and was overwritten on every Google sign-in, so it
- * can't be trusted for "when did this person sign up".
- */
-export async function getAuthCreationTimes() {
-  const times = new Map();
-  let pageToken;
-  do {
-    const result = await adminAuth.listUsers(1000, pageToken);
-    result.users.forEach(u => times.set(u.uid, new Date(u.metadata.creationTime)));
-    pageToken = result.pageToken;
-  } while (pageToken);
-  return times;
-}
 
 /**
  * The user IDs on one campus, or null for "all campuses". Most of the data
