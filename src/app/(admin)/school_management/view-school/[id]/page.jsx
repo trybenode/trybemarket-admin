@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import EditSchoolModal from "@/components/EditSchoolModal";
+import SchoolBranchCard from "@/components/SchoolBranchCard";
 import { useParams, useRouter } from "next/navigation";
 import { getSchoolById, deleteSchool, formatDate, getSchoolUsers } from "@/utils/schoolManagement";
 
@@ -226,6 +227,9 @@ function Page() {
             </div>
           </div>
         </div>
+
+      {/* TrybeMarket branch at this school (used in campaign message footers) */}
+      <SchoolBranchCard schoolId={school.id} branch={school.branch} onSaved={loadSchool} />
 
       {/* Users List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

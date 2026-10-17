@@ -1,6 +1,7 @@
 // src/utils/analytics.js
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { classifySubscriptions, getSegmentedUsers } from '@/lib/audience';
 
 // ─────────────────────────────────────────
 // HELPERS
@@ -61,57 +62,6 @@ function conversationRoles(c) {
   const sellerId = c.sellerId || c.product?.sellerId || null;
   const buyerId = c.buyerId || (c.participants || []).find(p => p && p !== sellerId) || null;
   return { sellerId, buyerId };
-}
-
-// Subscription docs coexist in 3 formats:
-//  1. New nested: { product: { planId, isActive, expiryDate (Timestamp) }, service, bundle }
-//     top-level planId/isActive are stale legacy fields — ignore them
-//  2. Old flat Premium: { planId: "Premium", isActive: true, expiryDate: Timestamp }
-//  3. Old Freemium: { planId: "Freemium", isActive: false } — no paid plan, skip
-// There is no `status` field, so a status == 'active' query always matches nothing.
-function classifySubscriptions(subSnap) {
-  const now = new Date();
-  const isActivePaidPlan = (plan) => {
-    if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
-    if (plan.category === 'boost') return false; // boosts are one-time, not subscriptions
-    if (!plan.isActive) return false;
-    const expiry = toDate(plan.expiryDate);
-    return Boolean(expiry && expiry > now);
-  };
-  const hadPaidPlan = (plan) => {
-    if (!plan?.planId || plan.planId === 'Freemium' || plan.planId.endsWith('_free')) return false;
-    if (plan.category === 'boost') return false;
-    return Boolean(plan.expiryDate);
-  };
-
-  const active = new Set();
-  const churned = new Set();
-  subSnap.forEach(doc => {
-    const data = doc.data();
-    const uid = data.userId || doc.id;
-
-    // Check nested format first (product/service/bundle sub-objects)
-    const hasActiveNested =
-      isActivePaidPlan(data.product) ||
-      isActivePaidPlan(data.service) ||
-      isActivePaidPlan(data.bundle);
-    const hadPaidNested =
-      hadPaidPlan(data.product) ||
-      hadPaidPlan(data.service) ||
-      hadPaidPlan(data.bundle);
-
-    // Check old flat format (top-level planId + expiryDate, no nested objects)
-    const flatPlan = (!data.product && !data.service && !data.bundle) ? data : null;
-    const hasActiveFlat = isActivePaidPlan(flatPlan);
-    const hadPaidFlat = hadPaidPlan(flatPlan);
-
-    if (hasActiveNested || hasActiveFlat) {
-      active.add(uid);
-    } else if (hadPaidNested || hadPaidFlat) {
-      churned.add(uid);
-    }
-  });
-  return { active, churned };
 }
 
 // ─────────────────────────────────────────
@@ -272,57 +222,13 @@ export async function getZeroResultSearches(campusName = null, days = 30, topN =
 // ─────────────────────────────────────────
 
 /**
- * Classify all users into segments for the admin user table.
+ * Segment counts and rows for the dashboard's User Segments section.
  * activated_active | activated_dormant | never_activated | subscribed | churned
+ * The rules live in src/lib/audience.js, shared with campaign audiences.
  */
 export async function getUserSegments(campusId = null, campusName = null) {
   try {
-    // users.selectedUniversity stores school name, not school doc ID
-    let usersQuery = adminDb.collection('users');
-    if (campusName) usersQuery = usersQuery.where('selectedUniversity', '==', campusName);
-    const usersSnap = await usersQuery.limit(500).get();
-
-    // Get users who have listed — read products + services directly (events collection
-    // is new and won't have historical data until the frontend instruments it)
-    const [productsSnap, servicesSnap] = await Promise.all([
-      adminDb.collection('products').select('userId').get(),
-      adminDb.collection('services').select('userId').get(),
-    ]);
-    const hasListed = new Set([
-      ...productsSnap.docs.map(d => d.data().userId),
-      ...servicesSnap.docs.map(d => d.data().userId),
-    ].filter(Boolean));
-
-    // Get users active in last 14 days — check products/services created recently
-    // (events collection will take over once the frontend instruments it)
-    const recentDate = daysAgoDate(14);
-    const recentTs = Timestamp.fromDate(recentDate);
-    const recentIso = recentDate.toISOString();
-
-    const getRecentListers = async (collectionName) => {
-      const tsSnap = await adminDb.collection(collectionName)
-        .where('createdAt', '>=', recentTs).select('userId').get();
-      if (tsSnap.size > 0) return tsSnap.docs.map(d => d.data().userId);
-      const strSnap = await adminDb.collection(collectionName)
-        .where('createdAt', '>=', recentIso).select('userId').get();
-      return strSnap.docs.map(d => d.data().userId);
-    };
-
-    const [recentProductIds, recentServiceIds] = await Promise.all([
-      getRecentListers('products'),
-      getRecentListers('services'),
-    ]);
-    const recentlyActive = new Set([...recentProductIds, ...recentServiceIds].filter(Boolean));
-
-    // Build set of in-scope user IDs so campus filter applies to subscription counts too
-    const inScopeUsers = new Set();
-    usersSnap.forEach(doc => inScopeUsers.add(doc.id));
-
-    const subSnap = await adminDb.collection('subscriptions').get();
-    const { active: allActive, churned: allChurned } = classifySubscriptions(subSnap);
-    const keep = (uid) => !campusId || inScopeUsers.has(uid);
-    const activeSubscribers = new Set([...allActive].filter(keep));
-    const churned = new Set([...allChurned].filter(keep));
+    const segmented = await getSegmentedUsers({ campusName });
 
     const segments = {
       activated_active: 0,
@@ -332,33 +238,16 @@ export async function getUserSegments(campusId = null, campusName = null) {
       churned: 0,
     };
 
-    const users = [];
-    usersSnap.forEach(doc => {
-      const u = doc.data();
-      const uid = doc.id;
-      let segment;
-
-      if (churned.has(uid)) {
-        segment = 'churned';
-      } else if (activeSubscribers.has(uid)) {
-        segment = 'subscribed';
-      } else if (!hasListed.has(uid)) {
-        segment = 'never_activated';
-      } else if (recentlyActive.has(uid)) {
-        segment = 'activated_active';
-      } else {
-        segment = 'activated_dormant';
-      }
-
+    const users = segmented.map(({ id, data: u, segment }) => {
       segments[segment]++;
-      users.push({
-        id: uid,
+      return {
+        id,
         name: u.fullName || u.email || 'Unknown',
         email: u.email,
         campus: u.selectedUniversity,
         joinedAt: u.createdAt?.toDate?.() || null,
         segment,
-      });
+      };
     });
 
     return { segments, users };
