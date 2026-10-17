@@ -152,12 +152,12 @@ export default function CampaignsPage() {
     return `${parts.join(' ')}.`;
   }, [audience, options]);
 
-  const handleTest = async ({ sendEmail, whatsappNumber }) => {
+  const handleTest = async ({ testEmail, whatsappNumber }) => {
     setTesting(true);
     setTestResult('');
     setTestError('');
     try {
-      const r = await sendTest({ mode, content, sendEmail, whatsappNumber });
+      const r = await sendTest({ mode, content, testEmail, whatsappNumber });
       setTestResult([r.email && `Email sent to ${r.email.to}`, r.whatsapp && `WhatsApp sent to +${r.whatsapp.to}`].filter(Boolean).join(' · '));
       loadOptions(); // today's email count changed
     } catch (err) {
@@ -262,6 +262,7 @@ export default function CampaignsPage() {
               counts={counts}
               emailToday={options.emailToday}
               audienceSummary={audienceSummary}
+              adminEmail={options.admin?.email || ''}
               onTest={handleTest}
               testing={testing}
               testResult={testResult}

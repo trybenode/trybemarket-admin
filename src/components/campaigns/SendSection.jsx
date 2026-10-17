@@ -13,12 +13,12 @@ const STATUS_TEXT = {
 };
 
 export default function SendSection({
-  name, onNameChange, mode, counts, emailToday, audienceSummary,
+  name, onNameChange, mode, counts, emailToday, audienceSummary, adminEmail,
   onTest, testing, testResult, testError,
   onSend, sending, progress, sendError, canSend, blockers,
 }) {
   const [confirming, setConfirming] = useState(false);
-  const [testEmail, setTestEmail] = useState(true);
+  const [testEmail, setTestEmail] = useState(adminEmail || '');
   const [testNumber, setTestNumber] = useState('');
   const showEmail = mode !== 'whatsapp';
   const showWhatsApp = mode !== 'email';
@@ -44,14 +44,22 @@ export default function SendSection({
         <div className="space-y-3">
           <p className="text-sm font-medium text-gray-700">Send a test to yourself</p>
           {showEmail && (
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={testEmail} onChange={(e) => setTestEmail(e.target.checked)} className="accent-indigo-600" />
-              Email to my admin address
-            </label>
+            <div>
+              <label htmlFor="test-email" className="block text-xs font-medium text-gray-600 mb-1">Test email goes to</label>
+              <input
+                id="test-email"
+                type="email"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           )}
           {showWhatsApp && (
             <input
               type="tel"
+              aria-label="WhatsApp number for the test"
               value={testNumber}
               onChange={(e) => setTestNumber(e.target.value)}
               placeholder="WhatsApp number for the test, e.g. 08012345678"
@@ -60,12 +68,16 @@ export default function SendSection({
           )}
           <button
             type="button"
-            onClick={() => onTest({ sendEmail: showEmail && testEmail, whatsappNumber: showWhatsApp ? testNumber.trim() : '' })}
-            disabled={testing || !canSend}
+            onClick={() => onTest({ testEmail: showEmail ? testEmail.trim() : '', whatsappNumber: showWhatsApp ? testNumber.trim() : '' })}
+            disabled={testing || !canSend || !((showEmail && testEmail.trim()) || (showWhatsApp && testNumber.trim()))}
             className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             {testing ? 'Sending test…' : 'Send test'}
           </button>
+          {!canSend && (
+            <p className="text-xs text-gray-500">Finish the message in step 2 first ({blockers[0]?.replace(/\.$/, '').toLowerCase()}).</p>
+          )}
+          <p className="text-xs text-gray-500">The test uses your name for the placeholders and starts the subject with [TEST].</p>
           {testResult && <p className="text-sm text-green-700">{testResult}</p>}
           {testError && <p className="text-sm text-red-600">{testError}</p>}
         </div>
