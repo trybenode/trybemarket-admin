@@ -9,6 +9,7 @@ import {
   getKYCStats 
 } from "@/utils/kyc";
 import { useAuth } from "@/context/AuthContext";
+import KycPhoto from "@/components/KycPhoto";
 
 const MAX_REASON_LENGTH = 300;
 // Mirrors KYC_CHECK_STALE_MS in the web app (lib/kycAccess.js): a "running"
@@ -429,71 +430,11 @@ function Page() {
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Front ID */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                    <div className="bg-indigo-50 px-3 py-2 border-b border-gray-200">
-                      <p className="text-xs font-semibold text-indigo-900">Front ID</p>
-                    </div>
-                    {selectedRequest.frontID ? (
-                      <>
-                        <img 
-                          src={selectedRequest.frontID} 
-                          alt="Front ID"
-                          className="w-full h-64 object-contain bg-white"
-                        />
-                        <div className="p-3 bg-white border-t border-gray-200">
-                          <a 
-                            href={selectedRequest.frontID} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            View Full Size
-                          </a>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-64 bg-gray-100">
-                        <p className="text-gray-400 text-sm">No front ID uploaded</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Back ID */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                    <div className="bg-indigo-50 px-3 py-2 border-b border-gray-200">
-                      <p className="text-xs font-semibold text-indigo-900">Back ID</p>
-                    </div>
-                    {selectedRequest.backID ? (
-                      <>
-                        <img 
-                          src={selectedRequest.backID} 
-                          alt="Back ID"
-                          className="w-full h-64 object-contain bg-white"
-                        />
-                        <div className="p-3 bg-white border-t border-gray-200">
-                          <a 
-                            href={selectedRequest.backID} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            View Full Size
-                          </a>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-64 bg-gray-100">
-                        <p className="text-gray-400 text-sm">No back ID uploaded</p>
-                      </div>
-                    )}
-                  </div>
+                  <KycPhoto request={selectedRequest} slot="front" label="Front ID" />
+                  <KycPhoto request={selectedRequest} slot="back" label="Back ID" />
+                  {selectedRequest.photos?.selfie && (
+                    <KycPhoto request={selectedRequest} slot="selfie" label="Selfie" />
+                  )}
                 </div>
               </div>
 

@@ -85,3 +85,57 @@ export async function relayToWebApp(request, webPath, method) {
     return NextResponse.json({ error: "Could not reach the TrybeMarket web app" }, { status: 502 });
   }
 }
+
+/**
+ * Relays an IMAGE from the web app (relayToWebApp only passes JSON) — used for
+ * private KYC photos, which the web app streams only to admins and logs each
+ * view of (kycAccessLog). Same token forwarding and protection bypass as
+ * above; the bytes are passed through with no caching.
+ */
+export async function relayImageFromWebApp(request, webPath) {
+  const baseUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
+  if (!baseUrl) {
+    return NextResponse.json(
+      { error: "NEXT_PUBLIC_WEB_APP_URL is not set on the admin server" },
+      { status: 500 }
+    );
+  }
+
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Missing authorization token" }, { status: 401 });
+  }
+
+  const bypassSecret = process.env.WEB_APP_PROTECTION_BYPASS_SECRET;
+
+  try {
+    const response = await fetch(new URL(webPath, baseUrl), {
+      headers: {
+        Authorization: authorization,
+        ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20000),
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok || !contentType.startsWith("image/")) {
+      // Errors come back as JSON from the web app; anything else is a config problem.
+      const body = contentType.includes("application/json")
+        ? await response.text()
+        : JSON.stringify({ error: `The web app at ${baseUrl} did not return an image (${response.status})` });
+      return new NextResponse(body, {
+        status: response.ok ? 502 : response.status,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      });
+    }
+
+    return new NextResponse(response.body, {
+      status: 200,
+      headers: { "Content-Type": contentType, "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    console.error("KYC photo relay error:", error);
+    return NextResponse.json({ error: "Could not reach the TrybeMarket web app" }, { status: 502 });
+  }
+}
