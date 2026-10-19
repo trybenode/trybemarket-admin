@@ -13,7 +13,7 @@ import Handlebars from 'handlebars';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { getCampaignAudience, MAX_SPECIFIC_PEOPLE } from '@/lib/audience';
-import { sendEmail, sendEmailBatch, MailError, MAX_BATCH_SIZE } from '@/lib/mailer';
+import { sendEmail, sendEmailBatch, MailError, MAX_BATCH_SIZE, DEFAULT_FROM } from '@/lib/mailer';
 import { getMarketingTemplates, sendTemplateMessage, WhatsAppError } from '@/lib/whatsapp';
 import { unsubscribePageUrl, unsubscribeHeaders } from '@/lib/unsubscribeLink';
 import {
@@ -131,7 +131,13 @@ export async function prepareContent(mode, content = {}) {
     if (subject.length > 200) throw new CampaignError('The email subject is too long (200 characters max).');
     const unknown = findUnknownPlaceholders(`${subject}\n${body}`);
     if (unknown.length) throw new CampaignError(`Unknown placeholder: {{${unknown[0]}}}. Use {{firstName}}, {{fullName}} or {{school}}.`);
-    prepared.email = { subject, body };
+    const style = content.email?.style === 'plain' ? 'plain' : 'branded';
+    prepared.email = { subject, body, style };
+    if (style === 'plain') {
+      const senderName = cleanSenderName(content.email?.senderName);
+      if (!senderName) throw new CampaignError('Add the name the plain email is signed with.');
+      prepared.email.senderName = senderName;
+    }
   }
 
   if (usesWhatsApp(mode)) {
@@ -190,17 +196,36 @@ async function getFooterLookup() {
   };
 }
 
-let compiledLayout = null;
-function layout() {
-  if (!compiledLayout) {
-    const source = fs.readFileSync(path.join(process.cwd(), 'templates', 'campaign.hbs'), 'utf-8');
-    compiledLayout = Handlebars.compile(source);
+// Email styles: "branded" (logo banner, card) and "plain" (reads like a
+// personal email, signed by a person — tends to land in Gmail's Primary tab
+// more often). Campaigns created before styles existed have no style → branded.
+const LAYOUT_FILES = { branded: 'campaign.hbs', plain: 'campaign-plain.hbs' };
+const compiledLayouts = {};
+function layout(style = 'branded') {
+  const key = LAYOUT_FILES[style] ? style : 'branded';
+  if (!compiledLayouts[key]) {
+    const source = fs.readFileSync(path.join(process.cwd(), 'templates', LAYOUT_FILES[key]), 'utf-8');
+    compiledLayouts[key] = Handlebars.compile(source);
   }
-  return compiledLayout;
+  return compiledLayouts[key];
 }
 
-/** The email one recipient gets: { subject, html, text, headers }. */
+// The sign-off / inbox sender name for plain emails, e.g. "Allen". Characters
+// that would break a From header are dropped.
+export function cleanSenderName(name) {
+  return String(name || '').replace(/[<>"(),;:@\\\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+const SENDER_ADDRESS = (DEFAULT_FROM.match(/<([^>]+)>/) || [null, DEFAULT_FROM])[1];
+
+/**
+ * The email one recipient gets: { subject, html, text, headers, from? }.
+ * Plain emails come "from" the person who signs them, e.g.
+ * "Allen from TrybeMarket <contact@trybemarket.online>" — same address, so
+ * SPF/DKIM/DMARC and replies are unchanged.
+ */
 export function renderEmail(emailContent, recipient, footerFor, { test = false } = {}) {
+  if (emailContent.style === 'plain') return renderPlainEmail(emailContent, recipient, footerFor, { test });
   const values = recipientValues(recipient);
   const subject = (test ? '[TEST] ' : '') + formatSubject(emailContent.subject, values);
   const footer = footerFor(recipient.school);
@@ -215,6 +240,31 @@ export function renderEmail(emailContent, recipient, footerFor, { test = false }
   const footerText = [footer.branchName, footer.address, footer.supportLine].filter(Boolean).join('\n');
   const text = `${formatEmailText(emailContent.body, values)}\n\nThe TrybeMarket Team\n\n${footerText}\n\nUnsubscribe from offers and updates: ${unsubscribeUrl}`;
   return { subject, html, text, headers: recipient.uid ? unsubscribeHeaders(recipient.uid) : undefined };
+}
+
+function renderPlainEmail(emailContent, recipient, footerFor, { test }) {
+  const values = recipientValues(recipient);
+  const subject = (test ? '[TEST] ' : '') + formatSubject(emailContent.subject, values);
+  const footer = footerFor(recipient.school);
+  const unsubscribeUrl = recipient.uid ? unsubscribePageUrl(recipient.uid) : '#';
+  const senderName = emailContent.senderName;
+  const html = layout('plain')({
+    subject,
+    bodyHtml: formatEmailHtml(emailContent.body, values),
+    senderName,
+    school: recipient.school,
+    unsubscribeUrl,
+    ...footer,
+  });
+  const footerText = footer.address ? `${footer.branchName} · ${footer.address}\n` : '';
+  const text = `${formatEmailText(emailContent.body, values)}\n\n${senderName}\nTrybeMarket\n\n${footerText}Unsubscribe: ${unsubscribeUrl}`;
+  return {
+    subject,
+    html,
+    text,
+    headers: recipient.uid ? unsubscribeHeaders(recipient.uid) : undefined,
+    from: `${senderName} from TrybeMarket <${SENDER_ADDRESS}>`,
+  };
 }
 
 /** The WhatsApp variable values one recipient gets: { name: text }. */
@@ -532,6 +582,7 @@ export async function listCampaigns(limit = 20) {
       audience: d.audience,
       template: d.content?.whatsapp?.template?.name || null,
       subject: d.content?.email?.subject || null,
+      emailStyle: d.content?.email ? d.content.email.style || 'branded' : null,
     };
   });
 }
@@ -590,6 +641,7 @@ export async function getCampaignDetail(id) {
     recipientCount: d.recipientCount,
     audience: d.audience,
     subject: d.content?.email?.subject || null,
+    emailStyle: d.content?.email ? d.content.email.style || 'branded' : null,
     template: d.content?.whatsapp?.template?.name || null,
     delivery: {
       email: email && {

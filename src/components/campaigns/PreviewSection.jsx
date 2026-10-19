@@ -43,6 +43,9 @@ export default function PreviewSection({ preview, loading, error, hint, onRefres
           {preview.email && (
             <div className={preview.whatsapp ? '' : 'lg:col-span-2'}>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Email</p>
+              {preview.email.from && (
+                <p className="text-sm text-gray-700"><span className="text-gray-500">From:</span> {preview.email.from}</p>
+              )}
               <p className="text-sm text-gray-700 mb-2"><span className="text-gray-500">Subject:</span> {preview.email.subject}</p>
               <iframe
                 title="Email preview"

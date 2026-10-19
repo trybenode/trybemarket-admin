@@ -2,6 +2,7 @@ import { requireAdminPages } from '@/lib/requireAdmin';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { prepareContent, renderEmail, renderWhatsAppValues, getFooterLookup } from '@/lib/campaigns';
 import { renderTemplateText } from '@/lib/whatsapp';
+import { DEFAULT_FROM } from '@/lib/mailer';
 import { sendCampaignError } from '@/lib/campaignApi';
 
 /**
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
     if (prepared.email) {
       const footerFor = await getFooterLookup();
       const email = renderEmail(prepared.email, recipient, footerFor);
-      result.email = { subject: email.subject, html: email.html };
+      result.email = { subject: email.subject, html: email.html, from: email.from || DEFAULT_FROM };
     }
     if (prepared.whatsapp) {
       const values = renderWhatsAppValues(prepared.whatsapp, recipient);
