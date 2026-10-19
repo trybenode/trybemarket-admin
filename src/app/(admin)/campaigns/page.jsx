@@ -7,6 +7,7 @@ import PreviewSection from '@/components/campaigns/PreviewSection';
 import SendSection from '@/components/campaigns/SendSection';
 import CampaignHistory from '@/components/campaigns/CampaignHistory';
 import CampaignSettings from '@/components/campaigns/CampaignSettings';
+import CampaignDetails from '@/components/campaigns/CampaignDetails';
 import {
   getCampaignOptions, listCampaigns, previewAudience, previewMessage,
   sendTest, createCampaign, saveCampaignSettings, runCampaign,
@@ -63,6 +64,7 @@ export default function CampaignsPage() {
   const [campaignsLoading, setCampaignsLoading] = useState(true);
   const [campaignsError, setCampaignsError] = useState('');
   const [resumingId, setResumingId] = useState(null);
+  const [detailId, setDetailId] = useState(null);
 
   const loadOptions = useCallback(async () => {
     try {
@@ -290,7 +292,9 @@ export default function CampaignsPage() {
               error={campaignsError}
               onResume={handleResume}
               resumingId={resumingId}
+              onOpen={setDetailId}
             />
+            {detailId && <CampaignDetails id={detailId} onClose={() => setDetailId(null)} />}
             <CampaignSettings
               settings={options.settings}
               emailToday={options.emailToday}

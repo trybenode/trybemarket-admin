@@ -47,3 +47,5 @@ export async function runCampaign(id, onProgress, shouldStop = () => false) {
 }
 
 export const searchPeople = (q) => call(`/api/campaigns/people?q=${encodeURIComponent(q)}`).then(d => d.people);
+
+export const getCampaignDetail = (id) => call(`/api/campaigns/${id}`);

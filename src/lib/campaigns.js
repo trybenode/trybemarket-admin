@@ -427,7 +427,14 @@ async function sendEmailChunk(id, campaign) {
   const now = new Date().toISOString();
   let sent = 0, failed = 0, quotaReached = granted < snap.size;
 
-  const markSent = (doc, resendId) => doc.ref.update({ emailStatus: { status: 'sent', resendId, sentAt: now, ...(doc.data().emailStatus?.fallback ? { fallback: true } : {}) } });
+  // emailMessages/{resendId} lets the Resend webhook (/api/webhooks/resend)
+  // match delivery reports back to this campaign and recipient.
+  const markSent = (doc, resendId) => Promise.all([
+    doc.ref.update({ emailStatus: { status: 'sent', resendId, sentAt: now, ...(doc.data().emailStatus?.fallback ? { fallback: true } : {}) } }),
+    resendId && adminDb.collection('emailMessages').doc(resendId).set({
+      campaignId: id, uid: doc.id, status: 'sent', statusAt: { sent: now },
+    }),
+  ]);
   const markFailed = (doc, error) => doc.ref.update({ emailStatus: { status: 'failed', error: String(error.message || error).slice(0, 300) } });
 
   try {
@@ -527,4 +534,81 @@ export async function listCampaigns(limit = 20) {
       subject: d.content?.email?.subject || null,
     };
   });
+}
+
+// ─────────────────────────────────────────
+// DETAIL (delivery results — Phase 5)
+// ─────────────────────────────────────────
+
+const EMAIL_STATES = ['pending', 'sent', 'delayed', 'delivered', 'bounced', 'complained', 'failed', 'skipped'];
+const WHATSAPP_STATES = ['pending', 'sent', 'delivered', 'read', 'failed', 'skipped'];
+
+/**
+ * One campaign with delivery results counted from its recipients:
+ *   email:    sent → delivered (plus bounced / spam reports / failed / waiting)
+ *   whatsapp: sent → delivered → read (plus failed)
+ * Statuses arrive afterwards through the Resend webhook (this app) and the
+ * WhatsApp webhook (web app), so these numbers keep growing after sending.
+ * Also returns up to 50 recipients it didn't work for, with the reason.
+ */
+export async function getCampaignDetail(id) {
+  const snap = await campaignRef(id).get();
+  if (!snap.exists) throw new CampaignError('Campaign not found.', 404);
+  const d = snap.data();
+  const recipients = campaignRef(id).collection('recipients');
+
+  const countBy = async (field, states) => {
+    const counts = await Promise.all(states.map(s => recipients.where(field, '==', s).count().get()));
+    return Object.fromEntries(states.map((s, i) => [s, counts[i].data().count]));
+  };
+  const [email, whatsapp, emailProblems, waProblems] = await Promise.all([
+    d.content?.email ? countBy('emailStatus.status', EMAIL_STATES) : null,
+    d.content?.whatsapp ? countBy('whatsapp.status', WHATSAPP_STATES) : null,
+    d.content?.email ? recipients.where('emailStatus.status', 'in', ['failed', 'bounced', 'complained']).limit(50).get() : null,
+    d.content?.whatsapp ? recipients.where('whatsapp.status', '==', 'failed').limit(50).get() : null,
+  ]);
+
+  const problems = [
+    ...(emailProblems?.docs || []).map(doc => {
+      const r = doc.data();
+      return { uid: doc.id, name: r.name, school: r.school, channel: 'email', status: r.emailStatus?.status, reason: r.emailStatus?.error || null };
+    }),
+    ...(waProblems?.docs || []).map(doc => {
+      const r = doc.data();
+      return { uid: doc.id, name: r.name, school: r.school, channel: 'whatsapp', status: 'failed', reason: r.whatsapp?.error || null };
+    }),
+  ];
+
+  return {
+    id: snap.id,
+    name: d.name,
+    mode: d.mode,
+    status: d.status,
+    createdAt: d.createdAt,
+    finishedAt: d.finishedAt || null,
+    createdBy: d.createdBy?.name || '',
+    recipientCount: d.recipientCount,
+    audience: d.audience,
+    subject: d.content?.email?.subject || null,
+    template: d.content?.whatsapp?.template?.name || null,
+    delivery: {
+      email: email && {
+        accepted: email.sent + email.delayed + email.delivered + email.bounced + email.complained,
+        delivered: email.delivered + email.complained, // a spam report means it arrived
+        waiting: email.sent + email.delayed,
+        bounced: email.bounced,
+        complained: email.complained,
+        failed: email.failed,
+        pending: email.pending,
+      },
+      whatsapp: whatsapp && {
+        accepted: whatsapp.sent + whatsapp.delivered + whatsapp.read,
+        delivered: whatsapp.delivered + whatsapp.read,
+        read: whatsapp.read,
+        failed: whatsapp.failed,
+        pending: whatsapp.pending,
+      },
+    },
+    problems,
+  };
 }
