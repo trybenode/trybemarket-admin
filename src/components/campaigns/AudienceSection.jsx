@@ -1,6 +1,8 @@
 'use client'
-import React from 'react';
+import React, { useRef } from 'react';
 import Select from 'react-select';
+import AsyncSelect from 'react-select/async';
+import { searchPeople } from '@/utils/campaignClient';
 
 // Step 1: who gets the campaign, and how. Counts come from the page
 // (POST /api/campaigns/audience) and update as the choices change.
@@ -18,6 +20,21 @@ const SIGNUP_OPTIONS = [
 ];
 
 export default function AudienceSection({ options, audience, mode, onAudienceChange, onModeChange, counts, countsLoading, countsError, onPreviewRecipient }) {
+  // Search only after typing pauses, not on every keystroke.
+  const searchTimer = useRef(null);
+  const loadPeople = (input) => new Promise((resolve) => {
+    clearTimeout(searchTimer.current);
+    if (input.trim().length < 2) return resolve([]);
+    searchTimer.current = setTimeout(() => {
+      searchPeople(input)
+        .then(people => resolve(people.map(p => ({
+          value: p.uid,
+          label: `${p.fullName || 'Unnamed'} · ${p.email}${p.school ? ` · ${p.school}` : ''}`,
+        }))))
+        .catch(() => resolve([]));
+    }, 350);
+  });
+
   const toggleSegment = (key) => {
     const next = audience.segments.includes(key)
       ? audience.segments.filter(k => k !== key)
@@ -36,6 +53,41 @@ export default function AudienceSection({ options, audience, mode, onAudienceCha
         <p className="text-sm text-gray-500">Segments are the same as the dashboard&apos;s User Segments.</p>
       </div>
 
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Who gets it">
+        {[['group', 'A group of users'], ['people', 'Specific people']].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={audience.who === key}
+            onClick={() => onAudienceChange({ ...audience, who: key })}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${audience.who === key ? 'bg-indigo-50 text-indigo-800 border-indigo-500' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {audience.who === 'people' ? (
+        <div>
+          <label htmlFor="campaign-people" className="block text-sm font-medium text-gray-700 mb-2">People</label>
+          <AsyncSelect
+            inputId="campaign-people"
+            instanceId="campaign-people"
+            isMulti
+            cacheOptions
+            loadOptions={loadPeople}
+            value={audience.people}
+            onChange={(sel) => onAudienceChange({ ...audience, people: sel || [] })}
+            placeholder="Type a name or email…"
+            noOptionsMessage={({ inputValue }) => (inputValue.trim().length < 2 ? 'Type at least 2 letters' : 'No matching users')}
+            classNamePrefix="react-select"
+            styles={{ menu: (b) => ({ ...b, zIndex: 50 }), control: (b) => ({ ...b, borderRadius: '0.5rem', borderColor: '#d1d5db' }) }}
+          />
+          <p className="mt-1 text-xs text-gray-500">People who unsubscribed or haven&apos;t opted in to WhatsApp still won&apos;t get it on that channel.</p>
+        </div>
+      ) : (
+      <>
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Segments</p>
         <div className="flex flex-wrap gap-2">
@@ -97,6 +149,8 @@ export default function AudienceSection({ options, audience, mode, onAudienceCha
           </select>
         </div>
       </div>
+      </>
+      )}
 
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Send by</p>

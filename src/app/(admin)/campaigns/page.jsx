@@ -15,7 +15,13 @@ import {
 // Campaigns: segment- and school-targeted WhatsApp and email
 // (08-campaign-messaging.md). Server logic lives in src/lib/campaigns.js.
 
-const EMPTY_AUDIENCE = { segments: [], schools: [], kyc: null, signedUpWithinDays: null };
+// who: 'group' (segments/schools/filters) or 'people' (picked users).
+const EMPTY_AUDIENCE = { who: 'group', segments: [], schools: [], kyc: null, signedUpWithinDays: null, people: [] };
+
+// The audience as the API expects it.
+const toApiAudience = (a) => (a.who === 'people'
+  ? { userIds: a.people.map(p => p.value) }
+  : { segments: a.segments, schools: a.schools, kyc: a.kyc, signedUpWithinDays: a.signedUpWithinDays });
 
 function useDebounced(value, ms) {
   const [debounced, setDebounced] = useState(value);
@@ -90,7 +96,7 @@ export default function CampaignsPage() {
     if (!options) return;
     const id = ++countsRequest.current;
     setCountsLoading(true);
-    previewAudience(debouncedAudience, mode)
+    previewAudience(toApiAudience(debouncedAudience), mode)
       .then((c) => { if (id === countsRequest.current) { setCounts(c); setCountsError(''); } })
       .catch((err) => { if (id === countsRequest.current) setCountsError(err.message); })
       .finally(() => { if (id === countsRequest.current) setCountsLoading(false); });
@@ -141,6 +147,10 @@ export default function CampaignsPage() {
 
   const audienceSummary = useMemo(() => {
     if (!options) return '';
+    if (audience.who === 'people') {
+      const names = audience.people.map(p => p.label.split(' · ')[0]);
+      return `${names.length} specific ${names.length === 1 ? 'person' : 'people'}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}.`;
+    }
     const segLabel = Object.fromEntries(options.segments.map(s => [s.key, s.label]));
     const schoolLabel = Object.fromEntries(options.schools.map(s => [s.value, s.label]));
     const parts = [
@@ -181,7 +191,7 @@ export default function CampaignsPage() {
     setSendError('');
     setProgress(null);
     try {
-      const created = await createCampaign({ name, mode, audience, content });
+      const created = await createCampaign({ name, mode, audience: toApiAudience(audience), content });
       setProgress({ status: 'sending', counts: { whatsapp: { targeted: created.whatsapp, sent: 0, failed: 0 }, email: { targeted: created.email, sent: 0, failed: 0 } } });
       await loadCampaigns();
       await run(created.id);

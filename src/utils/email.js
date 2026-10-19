@@ -45,14 +45,3 @@ export async function sendEmail(templateId, formData) {
         throw new Error(`Email sending failed: ${error.details || error.message}`);
     }
 }
-
-export async function sendBulkEmail(formData) {
-    const res = await authedFetch('/api/email/bulk-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Bulk send failed');
-    return data;
-}

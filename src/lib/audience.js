@@ -197,6 +197,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *     schools:  ['Lead City University of Ibadan', NO_SCHOOL, ...] | [] (= all),
  *     kyc: 'verified' | 'unverified' | null,
  *     signedUpWithinDays: number | null,
+ *     userIds: ['uid', ...],  // "specific people": when a list, the filters above are ignored
  *   }
  * Returns [{ uid, fullName, school, segment, email, phone, emailEligible,
  *            whatsappEligible }] — people reachable on neither channel are
@@ -206,7 +207,17 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Email needs a valid address and no marketingEmailOptOut.
  * WhatsApp needs a valid number and the explicit whatsappMarketing opt-in.
  */
+// Most people a "specific people" campaign can list.
+export const MAX_SPECIFIC_PEOPLE = 500;
+
 export async function getCampaignAudience(audience = {}) {
+  // "Specific people" whenever userIds is a list. An empty list means nobody,
+  // never everyone: a picker with nothing picked must not become a send-to-all.
+  const pickedPeople = Array.isArray(audience.userIds);
+  const userIds = pickedPeople
+    ? new Set(audience.userIds.filter(id => typeof id === 'string' && id).slice(0, MAX_SPECIFIC_PEOPLE))
+    : null;
+  if (pickedPeople && userIds.size === 0) return [];
   const segments = Array.isArray(audience.segments) ? audience.segments : [];
   const schools = Array.isArray(audience.schools) ? audience.schools : [];
   const kyc = audience.kyc === 'verified' || audience.kyc === 'unverified' ? audience.kyc : null;
@@ -215,8 +226,8 @@ export async function getCampaignAudience(audience = {}) {
   const [users, deletionSnap, kycSnap, authTimes] = await Promise.all([
     getSegmentedUsers(),
     adminDb.collection('dataDeletionRequests').select('email').get(),
-    kyc ? adminDb.collection('kycRequests').where('status', '==', 'verified').select('userId').get() : null,
-    withinDays ? getAuthCreationTimes() : null,
+    kyc && !pickedPeople ? adminDb.collection('kycRequests').where('status', '==', 'verified').select('userId').get() : null,
+    withinDays && !pickedPeople ? getAuthCreationTimes() : null,
   ]);
 
   const deletionEmails = new Set(
@@ -225,20 +236,30 @@ export async function getCampaignAudience(audience = {}) {
   const kycVerified = kycSnap ? new Set(kycSnap.docs.map(d => d.data().userId).filter(Boolean)) : null;
   const signedUpSince = withinDays ? Date.now() - withinDays * 24 * 60 * 60 * 1000 : null;
 
+  // The segment / school / KYC / signup filters ("a group of users").
+  const filterByGroup = (id, data, segment) => {
+    if (segments.length && !segments.includes(segment)) return false;
+    if (schools.length) {
+      const school = data.selectedUniversity || NO_SCHOOL;
+      if (!schools.includes(school)) return false;
+    }
+    if (kyc) {
+      const verified = data.isVerified === true || kycVerified.has(id);
+      if (kyc === 'verified' ? !verified : verified) return false;
+    }
+    if (signedUpSince) {
+      const created = authTimes.get(id);
+      if (!created || created.getTime() < signedUpSince) return false;
+    }
+    return true;
+  };
+
   return users
     .filter(({ id, data, segment }) => {
-      if (segments.length && !segments.includes(segment)) return false;
-      if (schools.length) {
-        const school = data.selectedUniversity || NO_SCHOOL;
-        if (!schools.includes(school)) return false;
-      }
-      if (kyc) {
-        const verified = data.isVerified === true || kycVerified.has(id);
-        if (kyc === 'verified' ? !verified : verified) return false;
-      }
-      if (signedUpSince) {
-        const created = authTimes.get(id);
-        if (!created || created.getTime() < signedUpSince) return false;
+      if (pickedPeople) {
+        if (!userIds.has(id)) return false;
+      } else if (!filterByGroup(id, data, segment)) {
+        return false;
       }
       const email = String(data.email || '').trim().toLowerCase();
       if (email && deletionEmails.has(email)) return false;
@@ -258,4 +279,23 @@ export async function getCampaignAudience(audience = {}) {
         whatsappEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappMarketing === true,
       };
     });
+}
+
+/**
+ * Users whose name or email contains `query` (case-insensitive), for the
+ * "specific people" picker: [{ uid, fullName, email, school }], at most `limit`.
+ */
+export async function searchUsers(query, limit = 20) {
+  const q = String(query || '').trim().toLowerCase();
+  if (q.length < 2) return [];
+  const snap = await adminDb.collection('users').select('fullName', 'email', 'selectedUniversity').get();
+  const matches = [];
+  for (const doc of snap.docs) {
+    const { fullName = '', email = '', selectedUniversity = '' } = doc.data();
+    if (String(fullName).toLowerCase().includes(q) || String(email).toLowerCase().includes(q)) {
+      matches.push({ uid: doc.id, fullName: fullName || '', email: email || '', school: selectedUniversity || '' });
+      if (matches.length >= limit) break;
+    }
+  }
+  return matches;
 }
