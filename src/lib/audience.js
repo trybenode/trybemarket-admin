@@ -204,7 +204,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * still included (eligible flags false), so counts can say why.
  *
  * Always excluded: accounts with a data-deletion request.
- * Email needs a valid address and no marketingEmailOptOut.
+ * Email needs a valid address that hasn't permanently bounced (emailBounced,
+ * set by the Resend webhook) and no marketingEmailOptOut.
  * WhatsApp needs a valid number and the explicit whatsappMarketing opt-in.
  */
 // Most people a "specific people" campaign can list.
@@ -275,7 +276,7 @@ export async function getCampaignAudience(audience = {}) {
         segment,
         email: EMAIL_RE.test(email) ? email : null,
         phone: WHATSAPP_NUMBER_RE.test(phone) ? phone : null,
-        emailEligible: EMAIL_RE.test(email) && data.marketingEmailOptOut !== true,
+        emailEligible: EMAIL_RE.test(email) && data.marketingEmailOptOut !== true && data.emailBounced !== true,
         whatsappEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappMarketing === true,
       };
     });

@@ -14,7 +14,7 @@ const STATUS_LABEL = { sending: 'Sending', paused_quota: 'Paused (email allowanc
 
 const formatWhen = (iso) => (iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
-export default function CampaignHistory({ campaigns, loading, error, onResume, resumingId }) {
+export default function CampaignHistory({ campaigns, loading, error, onResume, resumingId, onOpen }) {
   return (
     <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent campaigns</h2>
@@ -43,6 +43,13 @@ export default function CampaignHistory({ campaigns, loading, error, onResume, r
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_STYLE[c.status] || 'bg-gray-100 text-gray-700'}`}>
                   {STATUS_LABEL[c.status] || c.status}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => onOpen(c.id)}
+                  className="text-xs font-medium px-2.5 py-1 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Details
+                </button>
                 {(c.status === 'sending' || c.status === 'paused_quota') && (
                   <button
                     type="button"
