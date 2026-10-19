@@ -10,6 +10,35 @@ import {
 } from "@/utils/kyc";
 import { useAuth } from "@/context/AuthContext";
 
+const MAX_REASON_LENGTH = 300;
+// Mirrors KYC_CHECK_STALE_MS in the web app (lib/kycAccess.js): a "running"
+// automatic check older than this was abandoned.
+const KYC_CHECK_STALE_MS = 90 * 1000;
+
+// One line on what the web app's automatic ID check found, so an admin can
+// see why a request is waiting for them.
+function describeAutoCheck(request) {
+  const check = request.autoCheck;
+  if (!check) return "No automatic check recorded for this request.";
+  if (check.state === "running") {
+    return Date.now() - (check.startedAtMs || 0) < KYC_CHECK_STALE_MS
+      ? "Automatic check in progress…"
+      : "Automatic check didn't finish.";
+  }
+  if (check.state === "error") {
+    return `Automatic check couldn't run${check.message ? ` (${check.message})` : ""}.`;
+  }
+  const verdict = check.state === "passed" ? "Passed" : "Couldn't confirm";
+  return `${verdict}: name ${check.nameMatched ?? "?"}/${check.nameWords ?? "?"} words · ${
+    check.matricFound ? "matric found" : "matric not found"
+  } · ${check.institutionFound ? "school found" : "school not found"}`;
+}
+
+function describeRejection(reason) {
+  if (reason === "matric_already_used") return "This matric number is already linked to another verified account.";
+  return reason || "No reason recorded.";
+}
+
 function Page() {
   const { user } = useAuth();
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -18,6 +47,7 @@ function Page() {
   const [kycRequests, setKycRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -64,6 +94,7 @@ function Page() {
 
   const handleViewRequest = (request) => {
     setSelectedRequest(request);
+    setRejectReason("");
     setIsViewModalOpen(true);
   };
 
@@ -73,13 +104,29 @@ function Page() {
       return;
     }
 
+    const reason = rejectReason.trim();
+    if (newStatus === 'Rejected' && !reason) {
+      alert("Add a reason — it's included in the email to the student so they know what to fix.");
+      return;
+    }
+    // Approving a rejected request overrides an earlier decision; make that deliberate.
+    if (
+      newStatus === 'Approved' &&
+      selectedRequest?.status === 'rejected' &&
+      !window.confirm(
+        `This request was rejected: "${describeRejection(selectedRequest.rejectionReason)}"\n\nApprove it anyway? The student will be verified and get their credit and badge.`
+      )
+    ) {
+      return;
+    }
+
     try {
       setProcessing(true);
       
       if (newStatus === 'Approved') {
         await approveKYCRequest(requestId);
       } else if (newStatus === 'Rejected') {
-        await rejectKYCRequest(requestId, "Admin rejected the request");
+        await rejectKYCRequest(requestId, reason);
       }
       
       // Refresh the data after status change
@@ -456,7 +503,39 @@ function Page() {
                 <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusColor(selectedRequest.status)}`}>
                   {getStatusDisplay(selectedRequest.status)}
                 </span>
+                {selectedRequest.reviewMethod && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    {selectedRequest.reviewMethod === 'manual' ? 'Decided by an admin' : 'Decided automatically'}
+                  </span>
+                )}
+                <p className="mt-3 text-sm text-gray-700">
+                  <span className="font-medium">Automatic check:</span> {describeAutoCheck(selectedRequest)}
+                </p>
+                {selectedRequest.status === 'rejected' && (
+                  <p className="mt-1 text-sm text-gray-700">
+                    <span className="font-medium">Rejection reason:</span> {describeRejection(selectedRequest.rejectionReason)}
+                  </p>
+                )}
               </div>
+
+              {/* Rejection reason — required, and sent to the student */}
+              {selectedRequest.status === 'pending' && (
+                <div>
+                  <label htmlFor="rejectReason" className="text-sm font-semibold text-gray-700">
+                    Reason if rejecting <span className="font-normal text-gray-500">(sent to the student)</span>
+                  </label>
+                  <textarea
+                    id="rejectReason"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value.slice(0, MAX_REASON_LENGTH))}
+                    disabled={processing}
+                    rows={2}
+                    placeholder="e.g. The photo is blurry — please upload a clearer photo of your student ID."
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+                  />
+                  <p className="mt-1 text-right text-xs text-gray-400">{rejectReason.length}/{MAX_REASON_LENGTH}</p>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer - Action Buttons */}
@@ -469,40 +548,42 @@ function Page() {
                 Close
               </button>
               {selectedRequest.status === 'pending' && (
-                <>
-                  <button
-                    onClick={() => handleStatusChange(selectedRequest.id, 'Rejected')}
-                    disabled={processing}
-                    className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {processing ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Reject
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange(selectedRequest.id, 'Approved')}
-                    disabled={processing}
-                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {processing ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Approve
-                      </>
-                    )}
-                  </button>
-                </>
+                <button
+                  onClick={() => handleStatusChange(selectedRequest.id, 'Rejected')}
+                  disabled={processing}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processing ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Reject
+                    </>
+                  )}
+                </button>
+              )}
+              {/* A rejected request can still be approved — e.g. a genuine ID the
+                automatic check couldn't read, or a rejection made in error. */}
+              {(selectedRequest.status === 'pending' || selectedRequest.status === 'rejected') && (
+                <button
+                  onClick={() => handleStatusChange(selectedRequest.id, 'Approved')}
+                  disabled={processing}
+                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processing ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {selectedRequest.status === 'rejected' ? 'Approve anyway' : 'Approve'}
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </div>
