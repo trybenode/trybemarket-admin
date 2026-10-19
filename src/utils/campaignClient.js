@@ -45,3 +45,5 @@ export async function runCampaign(id, onProgress, shouldStop = () => false) {
   } while ((progress.busy || progress.status === 'sending') && !shouldStop());
   return progress;
 }
+
+export const searchPeople = (q) => call(`/api/campaigns/people?q=${encodeURIComponent(q)}`).then(d => d.people);

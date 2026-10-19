@@ -12,7 +12,7 @@ import crypto from 'crypto';
 import Handlebars from 'handlebars';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { getCampaignAudience } from '@/lib/audience';
+import { getCampaignAudience, MAX_SPECIFIC_PEOPLE } from '@/lib/audience';
 import { sendEmail, sendEmailBatch, MailError, MAX_BATCH_SIZE } from '@/lib/mailer';
 import { getMarketingTemplates, sendTemplateMessage, WhatsAppError } from '@/lib/whatsapp';
 import { unsubscribePageUrl, unsubscribeHeaders } from '@/lib/unsubscribeLink';
@@ -297,12 +297,14 @@ export async function createCampaign({ name, mode, audience, content, admin }) {
   await ref.set({
     name: String(name || '').trim().slice(0, 120) || 'Untitled campaign',
     mode,
-    audience: {
-      segments: audience.segments || [],
-      schools: audience.schools || [],
-      kyc: audience.kyc || null,
-      signedUpWithinDays: audience.signedUpWithinDays || null,
-    },
+    audience: Array.isArray(audience.userIds)
+      ? { userIds: audience.userIds.slice(0, MAX_SPECIFIC_PEOPLE) }
+      : {
+          segments: audience.segments || [],
+          schools: audience.schools || [],
+          kyc: audience.kyc || null,
+          signedUpWithinDays: audience.signedUpWithinDays || null,
+        },
     content: prepared,
     status: 'sending',
     createdBy: { uid: admin.uid, name: admin.name || '' },

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import PageHeader from '../../../components/PageHeader';
 import AdHocSendTab from '@/components/AdHocSendTab';
-import BulkSendTab from '@/components/BulkSendTab';
+import Link from 'next/link';
 
 
 export default function EmailCenterPage() {
@@ -10,7 +10,6 @@ export default function EmailCenterPage() {
 
     const tabs = [
         { id: 'adhoc', name: 'Manual/Transactional Send' },
-        { id: 'bulk', name: 'Bulk Newsletter Send' },
         // { id: 'logs', name: 'Delivery Logs & History' }, // Added for completeness in UI vision
     ];
 
@@ -18,8 +17,6 @@ export default function EmailCenterPage() {
         switch (activeTab) {
             case 'adhoc':
                 return <AdHocSendTab />;
-            case 'bulk':
-                return <BulkSendTab />;
             case 'logs':
                 return (
                     <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center text-gray-500">
@@ -38,7 +35,7 @@ export default function EmailCenterPage() {
                 {/* 1. Page Header */}
                 <PageHeader 
                     HeaderText="Email Center" 
-                    SubHeaderText="Manage targeted and bulk communications with Trybemarket users." 
+                    SubHeaderText="Send one-off emails to a single person, like a delisting notice." 
                 />
 
                 {/* 2. Tab Navigation - Cleaner Tabs */}
@@ -62,6 +59,11 @@ export default function EmailCenterPage() {
                         ))}
                     </nav>
                 </div>
+
+                <p className="text-sm text-gray-600 bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3">
+                    To email or WhatsApp a group of users (a segment, a school, or people you pick), use{" "}
+                    <Link href="/campaigns" className="font-medium text-indigo-700 underline">Campaigns</Link>.
+                </p>
 
                 {/* 3. Tab Content */}
                 <div className="pt-2">
