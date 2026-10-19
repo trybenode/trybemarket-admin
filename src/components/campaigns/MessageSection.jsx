@@ -10,7 +10,12 @@ export const DEFAULT_TEMPLATE_VALUES = {
   school_name: '{{school|your campus}}',
 };
 
-export default function MessageSection({ options, mode, email, whatsapp, onEmailChange, onWhatsAppChange }) {
+const EMAIL_STYLES = [
+  { key: 'branded', label: 'Branded', description: 'Logo banner and card layout' },
+  { key: 'plain', label: 'Plain', description: 'Looks like a personal email, signed by you. More likely to reach Gmail’s Primary tab.' },
+];
+
+export default function MessageSection({ options, mode, email, whatsapp, onEmailChange, onWhatsAppChange, adminName = '' }) {
   const bodyRef = useRef(null);
   const showEmail = mode !== 'whatsapp';
   const showWhatsApp = mode !== 'email';
@@ -102,6 +107,52 @@ export default function MessageSection({ options, mode, email, whatsapp, onEmail
       {showEmail && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Email</h3>
+          <div>
+            <p className="block text-sm font-medium text-gray-700 mb-2">Style</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {EMAIL_STYLES.map(s => (
+                <label
+                  key={s.key}
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-lg border cursor-pointer text-sm ${email.style === s.key ? 'border-indigo-500 bg-indigo-50 text-indigo-800' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                >
+                  <input
+                    type="radio"
+                    name="email-style"
+                    value={s.key}
+                    checked={email.style === s.key}
+                    onChange={() => onEmailChange({
+                      ...email,
+                      style: s.key,
+                      // Start the sign-off with the admin's first name.
+                      senderName: email.senderName || (s.key === 'plain' ? String(adminName).trim().split(/\s+/)[0] || '' : ''),
+                    })}
+                    className="mt-1 accent-indigo-600"
+                  />
+                  <span>
+                    <span className="font-medium">{s.label}</span>
+                    <span className="block text-xs text-gray-500">{s.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {email.style === 'plain' && (
+            <div>
+              <label htmlFor="campaign-sender" className="block text-sm font-medium text-gray-700 mb-1">Sign off as</label>
+              <input
+                id="campaign-sender"
+                type="text"
+                maxLength={40}
+                value={email.senderName}
+                onChange={(e) => onEmailChange({ ...email, senderName: e.target.value })}
+                placeholder="e.g. Allen"
+                className="w-full md:w-1/2 text-sm border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                {`Inbox shows “${(email.senderName || 'Name').trim()} from TrybeMarket”. Replies still go to contact@trybemarket.online.`}
+              </p>
+            </div>
+          )}
           <div>
             <label htmlFor="campaign-subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
             <input

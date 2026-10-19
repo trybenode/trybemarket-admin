@@ -39,7 +39,7 @@ export default function CampaignsPage() {
 
   const [audience, setAudience] = useState(EMPTY_AUDIENCE);
   const [mode, setMode] = useState('whatsapp_then_email');
-  const [email, setEmail] = useState({ subject: '', body: '' });
+  const [email, setEmail] = useState({ subject: '', body: '', style: 'branded', senderName: '' });
   const [whatsapp, setWhatsApp] = useState({ templateName: '', variables: {} });
   const [name, setName] = useState('');
 
@@ -117,6 +117,7 @@ export default function CampaignsPage() {
     if (mode !== 'whatsapp') {
       if (!email.subject.trim()) list.push('Add an email subject.');
       if (!email.body.trim()) list.push('Write the email message.');
+      if (email.style === 'plain' && !email.senderName.trim()) list.push('Add the name to sign off with.');
     }
     return list;
   }, [mode, options, whatsapp, email]);
@@ -258,6 +259,7 @@ export default function CampaignsPage() {
               whatsapp={whatsapp}
               onEmailChange={setEmail}
               onWhatsAppChange={setWhatsApp}
+              adminName={options.admin?.name || ''}
             />
             <PreviewSection
               preview={canSend ? preview : null}

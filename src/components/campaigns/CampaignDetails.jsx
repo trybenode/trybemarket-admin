@@ -75,7 +75,7 @@ export default function CampaignDetails({ id, onClose }) {
           {detail && (
             <>
               <div className="text-sm text-gray-700 space-y-1">
-                {detail.subject && <p><span className="text-gray-500">Email subject:</span> {detail.subject}</p>}
+                {detail.subject && <p><span className="text-gray-500">Email subject:</span> {detail.subject}{detail.emailStyle === 'plain' ? ' (plain style)' : ''}</p>}
                 {detail.template && <p><span className="text-gray-500">WhatsApp template:</span> {detail.template}</p>}
               </div>
 

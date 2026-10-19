@@ -32,7 +32,7 @@ export default function CampaignHistory({ campaigns, loading, error, onResume, r
                 <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
                 <p className="text-xs text-gray-500">
                   {formatWhen(c.createdAt)} · {c.createdBy} · {c.recipientCount} recipients
-                  {c.template ? ` · WhatsApp: ${c.template}` : ''}{c.subject ? ` · Email: “${c.subject}”` : ''}
+                  {c.template ? ` · WhatsApp: ${c.template}` : ''}{c.subject ? ` · Email${c.emailStyle === 'plain' ? ' (plain)' : ''}: “${c.subject}”` : ''}
                 </p>
                 <p className="text-xs text-gray-600 mt-0.5">
                   {c.counts?.whatsapp?.targeted > 0 && <>WhatsApp {c.counts.whatsapp.sent}/{c.counts.whatsapp.targeted}{c.counts.whatsapp.failed ? ` (${c.counts.whatsapp.failed} failed)` : ''} </>}
