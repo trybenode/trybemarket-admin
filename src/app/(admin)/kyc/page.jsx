@@ -1,57 +1,19 @@
 'use client'
 import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
-import { 
-  getAllKYCRequests, 
-  getKYCRequestsByStatus,
-  approveKYCRequest, 
-  rejectKYCRequest,
-  getKYCStats 
-} from "@/utils/kyc";
-import { useAuth } from "@/context/AuthContext";
-import KycPhoto from "@/components/KycPhoto";
-
-const MAX_REASON_LENGTH = 300;
-// Mirrors KYC_CHECK_STALE_MS in the web app (lib/kycAccess.js): a "running"
-// automatic check older than this was abandoned.
-const KYC_CHECK_STALE_MS = 90 * 1000;
-
-// One line on what the web app's automatic ID check found, so an admin can
-// see why a request is waiting for them.
-function describeAutoCheck(request) {
-  const check = request.autoCheck;
-  if (!check) return "No automatic check recorded for this request.";
-  if (check.state === "running") {
-    return Date.now() - (check.startedAtMs || 0) < KYC_CHECK_STALE_MS
-      ? "Automatic check in progress…"
-      : "Automatic check didn't finish.";
-  }
-  if (check.state === "error") {
-    return `Automatic check couldn't run${check.message ? ` (${check.message})` : ""}.`;
-  }
-  const verdict = check.state === "passed" ? "Passed" : "Couldn't confirm";
-  return `${verdict}: name ${check.nameMatched ?? "?"}/${check.nameWords ?? "?"} words · ${
-    check.matricFound ? "matric found" : "matric not found"
-  } · ${check.institutionFound ? "school found" : "school not found"}`;
-}
-
-function describeRejection(reason) {
-  if (reason === "matric_already_used") return "This matric number is already linked to another verified account.";
-  return reason || "No reason recorded.";
-}
+import { getAllKYCRequests, getKYCStats } from "@/utils/kyc";
+import KycReviewModal from "@/components/kyc/KycReviewModal";
 
 function Page() {
-  const { user } = useAuth();
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [kycRequests, setKycRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
+    provisional: 0,
     verified: 0,
     rejected: 0,
   });
@@ -95,59 +57,21 @@ function Page() {
 
   const handleViewRequest = (request) => {
     setSelectedRequest(request);
-    setRejectReason("");
     setIsViewModalOpen(true);
   };
 
-  const handleStatusChange = async (requestId, newStatus) => {
-    if (!user) {
-      alert("You must be logged in to perform this action.");
-      return;
-    }
-
-    const reason = rejectReason.trim();
-    if (newStatus === 'Rejected' && !reason) {
-      alert("Add a reason — it's included in the email to the student so they know what to fix.");
-      return;
-    }
-    // Approving a rejected request overrides an earlier decision; make that deliberate.
-    if (
-      newStatus === 'Approved' &&
-      selectedRequest?.status === 'rejected' &&
-      !window.confirm(
-        `This request was rejected: "${describeRejection(selectedRequest.rejectionReason)}"\n\nApprove it anyway? The student will be verified and get their credit and badge.`
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      
-      if (newStatus === 'Approved') {
-        await approveKYCRequest(requestId);
-      } else if (newStatus === 'Rejected') {
-        await rejectKYCRequest(requestId, reason);
-      }
-      
-      // Refresh the data after status change
-      await fetchKYCData();
-      
-      setIsViewModalOpen(false);
-      alert(`KYC request has been ${newStatus.toLowerCase()} successfully!`);
-    } catch (error) {
-      console.error("Error updating KYC status:", error);
-      // The server explains why (e.g. the matric number already belongs to another
-      // verified account), so show that rather than a generic failure.
-      alert(error.message || "Failed to update KYC status. Please try again.");
-    } finally {
-      setProcessing(false);
-    }
+  // After a decision in the review modal: refresh the list and say what happened
+  // (including the credit note after a revoke).
+  const handleDecided = async (message) => {
+    setIsViewModalOpen(false);
+    await fetchKYCData();
+    if (message) alert(message);
   };
 
   const getStatusColor = (status) => {
     switch(status) {
       case 'verified': return 'bg-green-100 text-green-800';
+      case 'provisional': return 'bg-blue-100 text-blue-800';
       case 'rejected': return 'bg-red-100 text-red-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -157,6 +81,7 @@ function Page() {
   const getStatusDisplay = (status) => {
     switch(status) {
       case 'verified': return 'Verified';
+      case 'provisional': return 'Provisional';
       case 'rejected': return 'Rejected';
       case 'pending': return 'Pending';
       default: return status;
@@ -274,6 +199,16 @@ function Page() {
             Pending ({stats.pending})
           </button>
           <button
+            onClick={() => setFilterStatus('provisional')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filterStatus === 'provisional'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Provisional ({stats.provisional || 0})
+          </button>
+          <button
             onClick={() => setFilterStatus('verified')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filterStatus === 'verified'
@@ -306,7 +241,7 @@ function Page() {
                   Student Details
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Matric Number
+                  Number
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
@@ -340,7 +275,9 @@ function Page() {
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="text-sm text-gray-900 font-mono">{request.matricNumber || 'N/A'}</span>
+                      <span className="text-sm text-gray-900 font-mono">
+                        {request.matricNumber || request.tempMatric || (request.libraryCardNumber ? `Card ${request.libraryCardNumber}` : 'N/A')}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -354,7 +291,6 @@ function Page() {
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handleViewRequest(request)}
-                      disabled={processing}
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Review
@@ -367,168 +303,12 @@ function Page() {
         </div>
       </div>
 
-      {/* View/Review Modal */}
       {isViewModalOpen && selectedRequest && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-linear-to-r from-indigo-50 to-white shrink-0">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                KYC Request Review
-              </h2>
-              <button
-                onClick={() => setIsViewModalOpen(false)}
-                className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Body - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* User Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Student Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Full Name</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedRequest.fullName || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Matric Number</p>
-                    <p className="text-sm font-medium text-gray-900 font-mono">{selectedRequest.matricNumber || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">User ID</p>
-                    <p className="text-xs font-medium text-gray-900 font-mono">{selectedRequest.userId || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Submitted Date</p>
-                    <p className="text-sm font-medium text-gray-900">{formatDate(selectedRequest.submittedDate)}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Student ID Images - Front and Back */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Student ID Card
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <KycPhoto request={selectedRequest} slot="front" label="Front ID" />
-                  <KycPhoto request={selectedRequest} slot="back" label="Back ID" />
-                  {selectedRequest.photos?.selfie && (
-                    <KycPhoto request={selectedRequest} slot="selfie" label="Selfie" />
-                  )}
-                </div>
-              </div>
-
-              {/* Current Status */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Current Status</h3>
-                <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${getStatusColor(selectedRequest.status)}`}>
-                  {getStatusDisplay(selectedRequest.status)}
-                </span>
-                {selectedRequest.reviewMethod && (
-                  <span className="ml-2 text-xs text-gray-500">
-                    {selectedRequest.reviewMethod === 'manual' ? 'Decided by an admin' : 'Decided automatically'}
-                  </span>
-                )}
-                <p className="mt-3 text-sm text-gray-700">
-                  <span className="font-medium">Automatic check:</span> {describeAutoCheck(selectedRequest)}
-                </p>
-                {selectedRequest.status === 'rejected' && (
-                  <p className="mt-1 text-sm text-gray-700">
-                    <span className="font-medium">Rejection reason:</span> {describeRejection(selectedRequest.rejectionReason)}
-                  </p>
-                )}
-              </div>
-
-              {/* Rejection reason — required, and sent to the student */}
-              {selectedRequest.status === 'pending' && (
-                <div>
-                  <label htmlFor="rejectReason" className="text-sm font-semibold text-gray-700">
-                    Reason if rejecting <span className="font-normal text-gray-500">(sent to the student)</span>
-                  </label>
-                  <textarea
-                    id="rejectReason"
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value.slice(0, MAX_REASON_LENGTH))}
-                    disabled={processing}
-                    rows={2}
-                    placeholder="e.g. The photo is blurry — please upload a clearer photo of your student ID."
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:opacity-50"
-                  />
-                  <p className="mt-1 text-right text-xs text-gray-400">{rejectReason.length}/{MAX_REASON_LENGTH}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer - Action Buttons */}
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 shrink-0">
-              <button
-                onClick={() => setIsViewModalOpen(false)}
-                disabled={processing}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Close
-              </button>
-              {selectedRequest.status === 'pending' && (
-                <button
-                  onClick={() => handleStatusChange(selectedRequest.id, 'Rejected')}
-                  disabled={processing}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processing ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Reject
-                    </>
-                  )}
-                </button>
-              )}
-              {/* A rejected request can still be approved — e.g. a genuine ID the
-                automatic check couldn't read, or a rejection made in error. */}
-              {(selectedRequest.status === 'pending' || selectedRequest.status === 'rejected') && (
-                <button
-                  onClick={() => handleStatusChange(selectedRequest.id, 'Approved')}
-                  disabled={processing}
-                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processing ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {selectedRequest.status === 'rejected' ? 'Approve anyway' : 'Approve'}
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <KycReviewModal
+          request={selectedRequest}
+          onClose={() => setIsViewModalOpen(false)}
+          onDecided={handleDecided}
+        />
       )}
       </>
       )}
