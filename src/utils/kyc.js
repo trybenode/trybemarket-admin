@@ -133,22 +133,17 @@ export const getKYCRequestsByUserId = async (userId) => {
 };
 
 /**
- * Records a manual KYC decision through the web app's server
- * (/api/kyc/decision -> web app /api/admin/kyc/decision).
+ * Sends a manual KYC decision to the web app's server
+ * (/api/kyc/decision -> web app /api/admin/kyc/decision), which runs the real
+ * verification transaction: only its server can set isVerified / kycLevel,
+ * award the KYC credit and badge, enforce one-number-one-account, and count
+ * (or reverse) a CRSA referral. Decisions can legitimately fail — e.g. the
+ * number belongs to another account — so the server's message is thrown
+ * as-is, with its details on `error.data` (e.g. `conflict`, `needsOverride`).
  *
- * This used to write kycRequests.status straight from the browser, which never
- * set users.isVerified (only the server can), so an "approved" student showed
- * as Verified while getting no verified status, no 150 credit, no badge and no
- * CRSA referral count. Approving now runs the real verification transaction,
- * including the one-matric-one-account check — so it can legitimately fail
- * (e.g. the matric already belongs to another verified account); the server's
- * message is thrown as-is so the admin sees why.
- *
- * @param {string} requestId - The KYC request id (same as the user's uid)
- * @param {"approve"|"reject"} decision
- * @param {string} [reason] - Rejection reason
+ * @param {object} payload - { userId?, decision, reason?, overrideEligibility?, takeOverClaim?, claimKey? }
  */
-async function submitKYCDecision(requestId, decision, reason) {
+async function submitKYCDecision(payload) {
   const user = auth.currentUser;
   if (!user) throw new Error("You must be logged in.");
 
@@ -156,34 +151,58 @@ async function submitKYCDecision(requestId, decision, reason) {
   const response = await fetch("/api/kyc/decision", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ userId: requestId, decision, reason }),
+    body: JSON.stringify(payload),
   });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = typeof data.error === "string" ? data.error : data.error?.message;
-    throw new Error(message || `Request failed (${response.status})`);
+    const error = new Error(message || `Request failed (${response.status})`);
+    error.data = data;
+    throw error;
   }
   return data;
 }
 
 /**
- * Approve/Verify KYC request (server-side — see submitKYCDecision).
- * @param {string} requestId - The ID of the KYC request
- * @returns {Promise<Object>} { status, referralCounted, emailSent, alreadyVerified? }
+ * Approve a KYC request. ID-card requests become FULL verification; fresher
+ * requests (portal screenshot / library card) become PROVISIONAL — the web
+ * app decides from the request's track.
+ * @param {string} requestId - The KYC request id (same as the user's uid)
+ * @param {{ overrideEligibility?: boolean, takeOverClaim?: boolean, reason?: string }} [options]
+ *   overrideEligibility: approve a request marked not eligible;
+ *   takeOverClaim: move a number claim held by another account to this student (reason required).
+ * @returns {Promise<Object>} { status, level, referralCounted, emailSent, alreadyVerified? }
  */
-export const approveKYCRequest = async (requestId) => {
-  return submitKYCDecision(requestId, "approve");
+export const approveKYCRequest = async (requestId, options = {}) => {
+  return submitKYCDecision({ userId: requestId, decision: "approve", ...options });
 };
 
 /**
- * Reject KYC request (server-side — see submitKYCDecision).
- * @param {string} requestId - The ID of the KYC request
- * @param {string} reason - Reason for rejection
+ * Reject a pending KYC request. The reason is emailed to the student.
  * @returns {Promise<Object>} { status, emailSent }
  */
 export const rejectKYCRequest = async (requestId, reason) => {
-  return submitKYCDecision(requestId, "reject", reason);
+  return submitKYCDecision({ userId: requestId, decision: "reject", reason });
+};
+
+/**
+ * Revoke a provisional or verified student's KYC. Undoes what the approval
+ * granted (badge, CRSA count), holds their listings and pauses their plans.
+ * Credit is not clawed back — `creditNote` says so when there was some.
+ * @returns {Promise<Object>} { status, referralReversed, creditNote, emailSent }
+ */
+export const revokeKYC = async (requestId, reason) => {
+  return submitKYCDecision({ userId: requestId, decision: "revoke", reason });
+};
+
+/**
+ * Free a number claim (e.g. an impostor's) so the real student can use it.
+ * Logged with the reason.
+ * @param {string} claimKey - e.g. "temp:2601164", "library:21246", "lcuug2512345"
+ */
+export const releaseKYCClaim = async (claimKey, reason) => {
+  return submitKYCDecision({ decision: "releaseClaim", claimKey, reason });
 };
 
 /**
@@ -244,6 +263,7 @@ export const getKYCStats = async () => {
       total: allRequests.length,
       pending: allRequests.filter(req => req.status === "pending").length,
       verified: allRequests.filter(req => req.status === "verified").length,
+      provisional: allRequests.filter(req => req.status === "provisional").length,
       rejected: allRequests.filter(req => req.status === "rejected").length,
     };
     
