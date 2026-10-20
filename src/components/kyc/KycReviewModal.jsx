@@ -85,6 +85,9 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
   const notEligible = request.eligibility?.eligible === false || request.rejectionReason === "not_eligible";
   const clash = request.claimConflict || error?.data?.conflict || null;
   const userCleared = user?.isVerified === true || !!user?.kycLevel;
+  // Recorded at submission; requests from before that show the profile as it is now.
+  const accountName = request.account ? request.account.fullName : user?.fullName;
+  const accountEmail = request.account ? request.account.email : user?.email;
 
   useEffect(() => {
     let cancelled = false;
@@ -171,7 +174,16 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
           {/* Student */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Student</h3>
-            <Row label="Full name">{request.fullName || "—"}</Row>
+            <Row label="Name on KYC">{request.fullName || "—"}</Row>
+            <Row label={request.account ? "Account name" : "Account name (profile now)"}>
+              {accountName || "—"}
+              {request.account?.nameDiffers && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  Differs from KYC name
+                </span>
+              )}
+            </Row>
+            <Row label="Account email"><span className="break-all">{accountEmail || "—"}</span></Row>
             <Row label="User ID"><span className="font-mono text-xs">{request.userId || request.id}</span></Row>
             <Row label="Route">{isFresher ? `Fresher — ${DOCUMENT_LABELS[documentType]}` : request.upgradeFrom === "provisional" ? "Student ID (upgrade from provisional)" : "Student ID card"}</Row>
             {request.matricNumber && <Row label="Matric number"><span className="font-mono">{request.matricNumber}</span></Row>}
