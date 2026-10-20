@@ -265,8 +265,20 @@ function Page() {
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{request.fullName || 'N/A'}</p>
-                        <p className="text-xs text-gray-500">User ID: {request.userId?.slice(0, 8)}...</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {request.fullName || 'N/A'}
+                          {request.account?.nameDiffers && (
+                            <span
+                              className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800"
+                              title={`Account name: ${request.account.fullName}`}
+                            >
+                              ≠ account name
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {request.account?.email || `User ID: ${request.userId?.slice(0, 8)}...`}
+                        </p>
                       </div>
                     </div>
                   </td>
