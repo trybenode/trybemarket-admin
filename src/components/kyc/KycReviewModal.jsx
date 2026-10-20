@@ -213,6 +213,9 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
                 {request.autoCheck?.state === "passed_review_sample" && (
                   <p className="mt-1 text-xs text-indigo-700">Passed every check — in review as part of the auto-pass sample.</p>
                 )}
+                {request.autoCheck?.state === "passed_launch_review" && (
+                  <p className="mt-1 text-xs text-indigo-700">Passed every check — in review because auto-pass is off. Your decision helps measure OCR accuracy.</p>
+                )}
               </div>
             )}
             {library && (
