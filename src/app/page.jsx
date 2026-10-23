@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Image from 'next/image';
@@ -17,7 +17,19 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
 
   const router = useRouter();
-  const { login, resetPassword } = useAuth();
+  const { login, resetPassword, user, isAdmin, loading } = useAuth();
+
+  // An admin who's already signed in goes straight to the dashboard. Only the
+  // first auth check shows the spinner: `loading` is also true while a login
+  // is being submitted, and hiding the form then would hide its errors.
+  const [firstCheckDone, setFirstCheckDone] = useState(false);
+  useEffect(() => {
+    if (!loading) setFirstCheckDone(true);
+  }, [loading]);
+  const signedInAdmin = Boolean(user) && isAdmin;
+  useEffect(() => {
+    if (firstCheckDone && signedInAdmin) router.replace('/dashboard');
+  }, [firstCheckDone, signedInAdmin, router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -32,11 +44,8 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
       await login(email, password);
+      // The effect above redirects as soon as the admin session is set.
       setSuccessMessage('Login successful! Redirecting...');
-      
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -66,6 +75,14 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  if (!firstCheckDone || signedInAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-800">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white" aria-label="Loading" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-800 p-4">
