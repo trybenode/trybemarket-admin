@@ -129,7 +129,7 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
 
   const approve = () => {
     if (request.status === "rejected" && !window.confirm(
-      `This request was rejected: "${describeRejection(request.rejectionReason)}"\n\nApprove it anyway?`
+      `This request was rejected: "${describeRejection(request.rejectionReason)}"\n\n${isFresher ? "Approve it as provisional anyway? They'll still need to submit their student ID card by the deadline." : "Approve it anyway?"}`
     )) return;
     run(
       (r) => approveKYCRequest(request.id, {
@@ -283,8 +283,16 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
             {notEligible && canApprove && (
               <label className="mt-2 flex items-center gap-2 text-sm text-gray-800">
                 <input type="checkbox" checked={overrideEligibility} onChange={(e) => setOverrideEligibility(e.target.checked)} />
-                Override eligibility (I've confirmed they're 100 or 200 level)
+                {isFresher
+                  ? "Approve provisionally anyway (e.g. a 300 level or older student who doesn't have their ID card yet)"
+                  : "Override eligibility (I've checked this student)"}
               </label>
+            )}
+            {notEligible && canApprove && isFresher && (
+              <p className="mt-1 text-xs text-gray-500">
+                Like 100–200 level approvals, this is provisional: they get the same deadline to submit their student ID card.
+                Add a reason below so it's on record.
+              </p>
             )}
           </section>
 
@@ -334,7 +342,7 @@ export default function KycReviewModal({ request, onClose, onDecided }) {
           )}
           {canApprove && (
             <button onClick={approve} disabled={processing} className={`${button} bg-green-600 text-white hover:bg-green-700`}>
-              {request.status === "rejected" ? "Approve anyway" : isFresher ? "Approve as provisional" : "Approve"}
+              {isFresher ? "Approve as provisional" : request.status === "rejected" ? "Approve anyway" : "Approve"}
             </button>
           )}
           {userCleared && (
