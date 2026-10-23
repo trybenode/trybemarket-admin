@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
+import AttributeReferralForm from "@/components/crsa/AttributeReferralForm";
 import {
   getCrsaLeaderboard,
   addCrsaMember,
@@ -213,6 +214,9 @@ function Page() {
               </button>
             </div>
           </form>
+
+          {/* Credit a student onboarded without the referral link */}
+          <AttributeReferralForm members={members} onDone={fetchMembers} />
 
           {/* Filter Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">

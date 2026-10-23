@@ -44,3 +44,10 @@ export const buildReferralLink = (code) => {
   const base = process.env.NEXT_PUBLIC_WEB_APP_URL;
   return base ? `${base.replace(/\/$/, "")}/signup?ref=${code}` : null;
 };
+
+/**
+ * Credits an existing student to an ambassador (onboarded without their
+ * link). Counts their KYC straight away if they're already verified.
+ */
+export const attributeReferral = (email, code, reason) =>
+  crsaFetch("/api/crsa/attribute", { method: "POST", body: { email, code, reason } });
