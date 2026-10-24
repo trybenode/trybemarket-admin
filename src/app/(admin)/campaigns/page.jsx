@@ -91,6 +91,10 @@ export default function CampaignsPage() {
     loadCampaigns();
   }, [loadOptions, loadCampaigns]);
 
+  // The chosen WhatsApp template's category decides who can get WhatsApp:
+  // marketing → opted in to offers, utility → message alerts on.
+  const whatsappCategory = options?.templates.find(t => t.name === whatsapp.templateName)?.category || 'marketing';
+
   // Live audience counts. Only the latest request may update the numbers.
   const debouncedAudience = useDebounced(audience, 400);
   const countsRequest = useRef(0);
@@ -98,11 +102,11 @@ export default function CampaignsPage() {
     if (!options) return;
     const id = ++countsRequest.current;
     setCountsLoading(true);
-    previewAudience(toApiAudience(debouncedAudience), mode)
+    previewAudience(toApiAudience(debouncedAudience), mode, whatsappCategory)
       .then((c) => { if (id === countsRequest.current) { setCounts(c); setCountsError(''); } })
       .catch((err) => { if (id === countsRequest.current) setCountsError(err.message); })
       .finally(() => { if (id === countsRequest.current) setCountsLoading(false); });
-  }, [debouncedAudience, mode, options]);
+  }, [debouncedAudience, mode, options, whatsappCategory]);
 
   const content = useMemo(() => ({ email, whatsapp }), [email, whatsapp]);
 
@@ -250,6 +254,7 @@ export default function CampaignsPage() {
               counts={counts}
               countsLoading={countsLoading}
               countsError={countsError}
+              whatsappCategory={whatsappCategory}
               onPreviewRecipient={setPreviewRecipient}
             />
             <MessageSection

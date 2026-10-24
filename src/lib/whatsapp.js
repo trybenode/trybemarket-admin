@@ -57,12 +57,16 @@ function templateVariables(text) {
 }
 
 /**
- * The account's APPROVED Marketing templates that campaigns can send:
- * [{ name, language, body, variables: [...], parameterFormat, buttons, footer }].
- * Templates whose header or buttons need per-message values are left out —
- * campaigns only fill body variables.
+ * The account's APPROVED templates that campaigns can send:
+ * [{ name, language, category, body, variables: [...], parameterFormat, buttons, footer, supported }].
+ * category is "marketing" (offers; only to people who opted in to offers) or
+ * "utility" (about the person's account, e.g. a KYC reminder; only to people
+ * with WhatsApp message alerts on — and not subject to Meta's per-person
+ * marketing limit, error 131049). Templates whose header or buttons need
+ * per-message values are marked unsupported — campaigns only fill body
+ * variables.
  */
-export async function getMarketingTemplates() {
+export async function getCampaignTemplates() {
   const wabaId = requireEnv('WHATSAPP_BUSINESS_ACCOUNT_ID');
   const templates = [];
   let after = null;
@@ -75,7 +79,7 @@ export async function getMarketingTemplates() {
   } while (after);
 
   return templates
-    .filter(t => t.status === 'APPROVED' && t.category === 'MARKETING')
+    .filter(t => t.status === 'APPROVED' && (t.category === 'MARKETING' || t.category === 'UTILITY'))
     .map(t => {
       const components = t.components || [];
       const body = components.find(c => c.type === 'BODY')?.text || '';
@@ -87,6 +91,7 @@ export async function getMarketingTemplates() {
       return {
         name: t.name,
         language: t.language,
+        category: t.category === 'UTILITY' ? 'utility' : 'marketing',
         body,
         footer: components.find(c => c.type === 'FOOTER')?.text || '',
         header: header?.format === 'TEXT' ? header.text : '',
@@ -96,7 +101,7 @@ export async function getMarketingTemplates() {
         supported: !needsExtraValues,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 }
 
 /**

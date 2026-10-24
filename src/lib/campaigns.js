@@ -14,7 +14,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { getCampaignAudience, MAX_SPECIFIC_PEOPLE } from '@/lib/audience';
 import { sendEmail, sendEmailBatch, MailError, MAX_BATCH_SIZE, DEFAULT_FROM } from '@/lib/mailer';
-import { getMarketingTemplates, sendTemplateMessage, WhatsAppError } from '@/lib/whatsapp';
+import { getCampaignTemplates, sendTemplateMessage, WhatsAppError } from '@/lib/whatsapp';
 import { unsubscribePageUrl, unsubscribeHeaders } from '@/lib/unsubscribeLink';
 import {
   findUnknownPlaceholders,
@@ -143,9 +143,9 @@ export async function prepareContent(mode, content = {}) {
   if (usesWhatsApp(mode)) {
     const templateName = content.whatsapp?.templateName;
     if (!templateName) throw new CampaignError('Choose a WhatsApp template.');
-    const templates = await getMarketingTemplates();
+    const templates = await getCampaignTemplates();
     const template = templates.find(t => t.name === templateName);
-    if (!template) throw new CampaignError(`WhatsApp template "${templateName}" isn't an approved Marketing template.`);
+    if (!template) throw new CampaignError(`WhatsApp template "${templateName}" isn't an approved template.`);
     if (!template.supported) throw new CampaignError(`WhatsApp template "${templateName}" needs header or button values, which campaigns can't fill yet.`);
     const variables = {};
     for (const name of template.variables) {
@@ -159,6 +159,7 @@ export async function prepareContent(mode, content = {}) {
       template: {
         name: template.name,
         language: template.language,
+        category: template.category,
         body: template.body,
         variables: template.variables,
         parameterFormat: template.parameterFormat,
@@ -283,9 +284,14 @@ export { getFooterLookup };
 
 // Which channels a recipient gets in a mode. "whatsapp_then_email" sends
 // WhatsApp where possible and email otherwise; if a WhatsApp message then
-// fails, sendNextChunk falls back to email (emailFallback).
-function channelsFor(mode, r) {
-  const wa = usesWhatsApp(mode) && r.whatsappEligible;
+// fails, sendNextChunk falls back to email (emailFallback). Who can get
+// WhatsApp depends on the template: marketing → opted in to offers, utility →
+// WhatsApp message alerts on. Campaigns from before categories existed were
+// all marketing.
+const whatsappConsent = (category) => (category === 'utility' ? 'utility' : 'marketing');
+function channelsFor(mode, r, category = 'marketing') {
+  const eligible = whatsappConsent(category) === 'utility' ? r.whatsappAlertsEligible : r.whatsappMarketingEligible;
+  const wa = usesWhatsApp(mode) && eligible;
   const email =
     mode === 'email' || mode === 'both' ? r.emailEligible :
     mode === 'whatsapp_then_email' ? r.emailEligible && !wa :
@@ -293,13 +299,16 @@ function channelsFor(mode, r) {
   return { wa, email, emailFallback: mode === 'whatsapp_then_email' && wa && r.emailEligible };
 }
 
-/** Counts (and a sample) for an audience in a mode — what the confirm step shows. */
-export async function previewAudience(audience, mode) {
+/**
+ * Counts (and a sample) for an audience in a mode — what the confirm step
+ * shows. `whatsappCategory` is the chosen template's category.
+ */
+export async function previewAudience(audience, mode, whatsappCategory = 'marketing') {
   const people = await getCampaignAudience(audience);
   let whatsapp = 0, email = 0, unreachable = 0;
   const reachable = [];
   for (const r of people) {
-    const { wa, email: em } = channelsFor(MODES[mode] ? mode : 'whatsapp_then_email', r);
+    const { wa, email: em } = channelsFor(MODES[mode] ? mode : 'whatsapp_then_email', r, whatsappCategory);
     if (wa) whatsapp++;
     if (em) email++;
     if (!wa && !em) unreachable++;
@@ -323,7 +332,7 @@ export async function createCampaign({ name, mode, audience, content, admin }) {
 
   const recipients = [];
   for (const r of people) {
-    const { wa, email, emailFallback } = channelsFor(mode, r);
+    const { wa, email, emailFallback } = channelsFor(mode, r, prepared.whatsapp?.template?.category);
     if (!wa && !email) continue;
     recipients.push({
       uid: r.uid,
@@ -432,7 +441,7 @@ async function sendWhatsAppChunk(id, campaign) {
           fallback++;
         }
         await doc.ref.update(update);
-        if (error.code === STOPPED_MARKETING) {
+        if (error.code === STOPPED_MARKETING && whatsappConsent(campaign.content.whatsapp.template.category) === 'marketing') {
           await adminDb.collection('users').doc(r.uid).update({
             whatsappMarketing: false,
             whatsappMarketingOptOutAt: new Date().toISOString(),
@@ -565,9 +574,31 @@ export async function sendNextChunk(id) {
   }
 }
 
+// Statuses that mean "went out and hasn't failed" vs "didn't get there" —
+// including what Meta and Resend report after sending (e.g. WhatsApp 131049,
+// email bounces), which the counts saved at send time don't include.
+const WA_SENT = ['sent', 'delivered', 'read'];
+const EMAIL_SENT = ['sent', 'delayed', 'delivered', 'complained'];
+const EMAIL_FAILED = ['failed', 'bounced'];
+
+async function liveCounts(ref, counts) {
+  const recipients = ref.collection('recipients');
+  const n = async (field, op, value) => (await recipients.where(field, op, value).count().get()).data().count;
+  const [waSent, waFailed, emSent, emFailed] = await Promise.all([
+    counts?.whatsapp?.targeted ? n('whatsapp.status', 'in', WA_SENT) : 0,
+    counts?.whatsapp?.targeted ? n('whatsapp.status', '==', 'failed') : 0,
+    counts?.email?.targeted ? n('emailStatus.status', 'in', EMAIL_SENT) : 0,
+    counts?.email?.targeted ? n('emailStatus.status', 'in', EMAIL_FAILED) : 0,
+  ]);
+  return {
+    whatsapp: { targeted: counts?.whatsapp?.targeted || 0, sent: waSent, failed: waFailed },
+    email: { targeted: counts?.email?.targeted || 0, sent: emSent, failed: emFailed },
+  };
+}
+
 export async function listCampaigns(limit = 20) {
   const snap = await adminDb.collection('campaigns').orderBy('createdAt', 'desc').limit(limit).get();
-  return snap.docs.map(doc => {
+  return Promise.all(snap.docs.map(async doc => {
     const d = doc.data();
     return {
       id: doc.id,
@@ -578,13 +609,14 @@ export async function listCampaigns(limit = 20) {
       finishedAt: d.finishedAt || null,
       createdBy: d.createdBy?.name || '',
       recipientCount: d.recipientCount,
-      counts: d.counts,
+      counts: await liveCounts(doc.ref, d.counts),
       audience: d.audience,
       template: d.content?.whatsapp?.template?.name || null,
+      templateCategory: d.content?.whatsapp ? whatsappConsent(d.content.whatsapp.template?.category) : null,
       subject: d.content?.email?.subject || null,
       emailStyle: d.content?.email ? d.content.email.style || 'branded' : null,
     };
-  });
+  }));
 }
 
 // ─────────────────────────────────────────

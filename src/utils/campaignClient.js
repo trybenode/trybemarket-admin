@@ -15,7 +15,8 @@ async function call(path, { method = 'GET', body } = {}) {
 
 export const getCampaignOptions = () => call('/api/campaigns/options');
 export const listCampaigns = () => call('/api/campaigns').then(d => d.campaigns);
-export const previewAudience = (audience, mode) => call('/api/campaigns/audience', { method: 'POST', body: { audience, mode } });
+export const previewAudience = (audience, mode, whatsappCategory) =>
+  call('/api/campaigns/audience', { method: 'POST', body: { audience, mode, whatsappCategory } });
 export const previewMessage = (mode, content, uid) => call('/api/campaigns/preview', { method: 'POST', body: { mode, content, uid } });
 export const sendTest = (body) => call('/api/campaigns/test', { method: 'POST', body });
 export const createCampaign = (body) => call('/api/campaigns', { method: 'POST', body });
