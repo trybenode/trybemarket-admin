@@ -200,13 +200,15 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *     userIds: ['uid', ...],  // "specific people": when a list, the filters above are ignored
  *   }
  * Returns [{ uid, fullName, school, segment, email, phone, emailEligible,
- *            whatsappEligible }] — people reachable on neither channel are
+ *            whatsappMarketingEligible, whatsappAlertsEligible }] — people reachable on neither channel are
  * still included (eligible flags false), so counts can say why.
  *
  * Always excluded: accounts with a data-deletion request.
  * Email needs a valid address that hasn't permanently bounced (emailBounced,
  * set by the Resend webhook) and no marketingEmailOptOut.
- * WhatsApp needs a valid number and the explicit whatsappMarketing opt-in.
+ * WhatsApp needs a valid number plus, for marketing templates, the explicit
+ * whatsappMarketing opt-in, or for utility templates, WhatsApp message alerts
+ * (whatsappNotifications).
  */
 // Most people a "specific people" campaign can list.
 export const MAX_SPECIFIC_PEOPLE = 500;
@@ -277,7 +279,8 @@ export async function getCampaignAudience(audience = {}) {
         email: EMAIL_RE.test(email) ? email : null,
         phone: WHATSAPP_NUMBER_RE.test(phone) ? phone : null,
         emailEligible: EMAIL_RE.test(email) && data.marketingEmailOptOut !== true && data.emailBounced !== true,
-        whatsappEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappMarketing === true,
+        whatsappMarketingEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappMarketing === true,
+        whatsappAlertsEligible: WHATSAPP_NUMBER_RE.test(phone) && data.whatsappNotifications === true,
       };
     });
 }

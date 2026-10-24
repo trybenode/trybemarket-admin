@@ -19,7 +19,7 @@ const SIGNUP_OPTIONS = [
   { value: '90', label: 'Last 90 days' },
 ];
 
-export default function AudienceSection({ options, audience, mode, onAudienceChange, onModeChange, counts, countsLoading, countsError, onPreviewRecipient }) {
+export default function AudienceSection({ options, audience, mode, onAudienceChange, onModeChange, counts, countsLoading, countsError, onPreviewRecipient, whatsappCategory = 'marketing' }) {
   // Search only after typing pauses, not on every keystroke.
   const searchTimer = useRef(null);
   const loadPeople = (input) => new Promise((resolve) => {
@@ -199,7 +199,9 @@ export default function AudienceSection({ options, audience, mode, onAudienceCha
             )}
             {counts.whatsapp === 0 && mode !== 'email' && (
               <p className="mt-3 text-xs text-gray-500">
-                WhatsApp only goes to people who switched on &ldquo;Offers &amp; updates on WhatsApp&rdquo; in the web app.
+                {whatsappCategory === 'utility'
+                  ? 'Utility WhatsApp messages only go to people with WhatsApp message alerts on.'
+                  : 'Marketing WhatsApp messages only go to people who switched on “Offers & updates on WhatsApp” in the web app.'}
               </p>
             )}
           </>

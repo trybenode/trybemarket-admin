@@ -1,7 +1,7 @@
 import { requireAdminPages } from '@/lib/requireAdmin';
 import { SEGMENT_KEYS, SEGMENT_LABELS, NO_SCHOOL, getSchoolsInUse } from '@/lib/audience';
 import { MODES, getCampaignSettings, getEmailUsageToday } from '@/lib/campaigns';
-import { getMarketingTemplates } from '@/lib/whatsapp';
+import { getCampaignTemplates } from '@/lib/whatsapp';
 import { PLACEHOLDERS } from '@/lib/messageFormat';
 
 /**
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       getSchoolsInUse(),
       getCampaignSettings(),
       getEmailUsageToday(),
-      getMarketingTemplates().then(
+      getCampaignTemplates().then(
         (list) => ({ list }),
         (error) => ({ list: [], error: error.message })
       ),

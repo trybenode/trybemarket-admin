@@ -76,13 +76,18 @@ export default function MessageSection({ options, mode, email, whatsapp, onEmail
                   <option value="">Choose an approved template…</option>
                   {options.templates.map(t => (
                     <option key={`${t.name}-${t.language}`} value={t.name} disabled={!t.supported}>
-                      {t.name}{t.supported ? '' : ' (needs header/button values, not supported)'}
+                      {t.name} · {t.category === 'utility' ? 'Utility' : 'Marketing'}{t.supported ? '' : ' (needs header/button values, not supported)'}
                     </option>
                   ))}
                 </select>
               </div>
               {template && (
                 <>
+                  <p className="text-xs text-gray-600">
+                    {template.category === 'utility'
+                      ? 'Utility: about the student’s account (e.g. finish KYC) — no offers. Goes to people with WhatsApp message alerts on, and isn’t held back by Meta’s limit on marketing messages.'
+                      : 'Marketing: offers and promotions. Goes only to people who opted in to offers on WhatsApp; Meta may hold some back (error 131049) to limit marketing per person.'}
+                  </p>
                   <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-line">{template.body}</p>
                   {template.variables.map(v => (
                     <div key={v}>
